@@ -6,14 +6,19 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		E662969D2ED8C1EA00E9637E /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = E662969C2ED8C1EA00E9637E /* FirebaseAnalytics */; };
+		E662969F2ED8C1EA00E9637E /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = E662969E2ED8C1EA00E9637E /* FirebaseFirestore */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
-		E6776CBB2ED1CDE0003075B0 /* StudyBloom.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "StudyBloom.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		E6776CBB2ED1CDE0003075B0 /* StudyBloom.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StudyBloom.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		E6776CBD2ED1CDE1003075B0 /* StudyBloom */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "StudyBloom";
+			path = StudyBloom;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -23,6 +28,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E662969D2ED8C1EA00E9637E /* FirebaseAnalytics in Frameworks */,
+				E662969F2ED8C1EA00E9637E /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -63,10 +70,12 @@
 			fileSystemSynchronizedGroups = (
 				E6776CBD2ED1CDE1003075B0 /* StudyBloom */,
 			);
-			name = "StudyBloom";
+			name = StudyBloom;
 			packageProductDependencies = (
+				E662969C2ED8C1EA00E9637E /* FirebaseAnalytics */,
+				E662969E2ED8C1EA00E9637E /* FirebaseFirestore */,
 			);
-			productName = "StudyBloom";
+			productName = StudyBloom;
 			productReference = E6776CBB2ED1CDE0003075B0 /* StudyBloom.app */;
 			productType = "com.apple.product-type.application";
 		};
@@ -94,6 +103,9 @@
 			);
 			mainGroup = E6776CB22ED1CDE0003075B0;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				E662969B2ED8C1EA00E9637E /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E6776CBC2ED1CDE0003075B0 /* Products */;
 			projectDirPath = "";
@@ -328,7 +340,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		E6776CC62ED1CDE2003075B0 /* Build configuration list for PBXNativeTarget "Rezy Buddy" */ = {
+		E6776CC62ED1CDE2003075B0 /* Build configuration list for PBXNativeTarget "StudyBloom" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E6776CC72ED1CDE2003075B0 /* Debug */,
@@ -338,6 +350,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		E662969B2ED8C1EA00E9637E /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.6.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		E662969C2ED8C1EA00E9637E /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E662969B2ED8C1EA00E9637E /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+		E662969E2ED8C1EA00E9637E /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E662969B2ED8C1EA00E9637E /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = E6776CB32ED1CDE0003075B0 /* Project object */;
 }
