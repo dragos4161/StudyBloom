@@ -12,6 +12,7 @@ import SwiftData
 @main
 struct StudyBloomApp: App {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage("isDarkMode") private var isDarkMode = false
     
     var body: some Scene {
         WindowGroup {
@@ -22,5 +23,6 @@ struct StudyBloomApp: App {
             }
         }
         .modelContainer(for: [Chapter.self, StudyPlan.self, DailyLog.self])
+        .environment(\.colorScheme, isDarkMode ? .dark : .light)
     }
 }

@@ -3,6 +3,7 @@ import SwiftUI
 struct ProfileView: View {
     @AppStorage("userName") private var userName = ""
     @AppStorage("userEmail") private var userEmail = ""
+    @AppStorage("isDarkMode") private var isDarkMode = false
     
     var body: some View {
         NavigationView {
@@ -28,7 +29,7 @@ struct ProfileView: View {
                 
                 Section(header: Text("Settings")) {
                     Toggle("Notifications", isOn: .constant(true))
-                    Toggle("Dark Mode", isOn: .constant(false))
+                    Toggle("Dark Mode", isOn: $isDarkMode)
                 }
                 
                 Section {
