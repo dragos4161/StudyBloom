@@ -45,4 +45,37 @@ class FirebaseService: ObservableObject {
             }
         }
     }
+    
+    func createOrUpdateUser(_ user: User) async throws {
+        guard let userId = user.id else {
+            throw NSError(domain: "FirebaseService", code: -1, userInfo: [NSLocalizedDescriptionKey: "User ID is required"])
+        }
+        
+        let userRef = db.collection("users").document(userId)
+        
+        do {
+            // Check if user already exists
+            let document = try await userRef.getDocument()
+            
+            if document.exists {
+                // User exists - update only the updatedAt timestamp
+                try await userRef.updateData([
+                    "updatedAt": Timestamp(date: Date())
+                ])
+                print("✅ Updated existing user: \(userId)")
+            } else {
+                // New user - create with all data including timestamps
+                var newUser = user
+                let now = Date()
+                newUser.createdAt = now
+                newUser.updatedAt = now
+                
+                try userRef.setData(from: newUser)
+                print("✅ Created new user in Firestore: \(userId)")
+            }
+        } catch {
+            print("❌ Error creating/updating user in Firestore: \(error.localizedDescription)")
+            throw error
+        }
+    }
 }

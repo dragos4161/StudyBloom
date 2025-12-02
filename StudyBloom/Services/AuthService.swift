@@ -10,6 +10,7 @@ class AuthService: NSObject, ObservableObject {
     @Published var isLoading = false
     
     private var currentNonce: String?
+    private let firebaseService = FirebaseService()
     
     override init() {
         super.init()
@@ -107,7 +108,9 @@ extension AuthService: ASAuthorizationControllerDelegate {
             
             isLoading = true
             Auth.auth().signIn(with: credential) { [weak self] (authResult, error) in
-                self?.isLoading = false
+                guard let self = self else { return }
+                self.isLoading = false
+                
                 if let error = error {
                     print("❌ Firebase Authentication Error:")
                     print("Error Code: \(error._code)")
@@ -116,7 +119,25 @@ extension AuthService: ASAuthorizationControllerDelegate {
                     print("Full Error: \(error)")
                     return
                 }
+                
                 print("✅ User signed in with Apple successfully!")
+                
+                // Create or update user in Firestore
+                if let firebaseUser = authResult?.user {
+                    let user = User(
+                        id: firebaseUser.uid,
+                        name: firebaseUser.displayName ?? "User",
+                        email: firebaseUser.email ?? ""
+                    )
+                    
+                    Task {
+                        do {
+                            try await self.firebaseService.createOrUpdateUser(user)
+                        } catch {
+                            print("❌ Failed to create/update user in Firestore: \(error.localizedDescription)")
+                        }
+                    }
+                }
             }
         }
     }

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ProfileView: View {
+    @EnvironmentObject var authService: AuthService
     @AppStorage("userName") private var userName = ""
     @AppStorage("userEmail") private var userEmail = ""
     @AppStorage("isDarkMode") private var isDarkMode = false
@@ -34,7 +35,7 @@ struct ProfileView: View {
                 
                 Section {
                     Button("Sign Out") {
-                        // Sign out action
+                        authService.signOut()
                     }
                     .foregroundColor(.red)
                 }
