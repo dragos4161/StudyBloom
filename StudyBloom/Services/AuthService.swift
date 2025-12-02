@@ -1,15 +1,142 @@
 import Foundation
 import Combine
-// import FirebaseAuth // Uncomment when Firebase is added
+import FirebaseAuth
+import AuthenticationServices
+import CryptoKit
 
-class AuthService: ObservableObject {
+class AuthService: NSObject, ObservableObject {
     @Published var user: User?
+    @Published var isAuthenticated = false
+    @Published var isLoading = false
     
-    func signIn() {
-        // TODO: Implement Firebase Sign In
+    private var currentNonce: String?
+    
+    override init() {
+        super.init()
+        setupAuthListener()
+    }
+    
+    private func setupAuthListener() {
+        Auth.auth().addStateDidChangeListener { [weak self] _, firebaseUser in
+            guard let self = self else { return }
+            
+            if let firebaseUser = firebaseUser {
+                self.user = User(
+                    id: firebaseUser.uid,
+                    name: firebaseUser.displayName ?? "User",
+                    email: firebaseUser.email ?? ""
+                )
+                self.isAuthenticated = true
+            } else {
+                self.user = nil
+                self.isAuthenticated = false
+            }
+        }
+    }
+    
+    func startSignInWithApple() {
+        let nonce = randomNonceString()
+        currentNonce = nonce
+        let appleIDProvider = ASAuthorizationAppleIDProvider()
+        let request = appleIDProvider.createRequest()
+        request.requestedScopes = [.fullName, .email]
+        request.nonce = sha256(nonce)
+        
+        let authorizationController = ASAuthorizationController(authorizationRequests: [request])
+        authorizationController.delegate = self
+        authorizationController.presentationContextProvider = self
+        authorizationController.performRequests()
     }
     
     func signOut() {
-        // TODO: Implement Firebase Sign Out
+        do {
+            try Auth.auth().signOut()
+        } catch {
+            print("Error signing out: \(error.localizedDescription)")
+        }
+    }
+    
+    // MARK: - Helpers
+    
+    private func randomNonceString(length: Int = 32) -> String {
+        precondition(length > 0)
+        var randomBytes = [UInt8](repeating: 0, count: length)
+        let errorCode = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
+        if errorCode != errSecSuccess {
+            fatalError("Unable to generate nonce. SecRandomCopyBytes failed with OSStatus \(errorCode)")
+        }
+        
+        let charset: [Character] = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
+        
+        let nonce = randomBytes.map { byte in
+            charset[Int(byte) % charset.count]
+        }
+        
+        return String(nonce)
+    }
+    
+    private func sha256(_ input: String) -> String {
+        let inputData = Data(input.utf8)
+        let hashedData = SHA256.hash(data: inputData)
+        let hashString = hashedData.compactMap {
+            String(format: "%02x", $0)
+        }.joined()
+        
+        return hashString
+    }
+}
+
+extension AuthService: ASAuthorizationControllerDelegate {
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
+            guard let nonce = currentNonce else {
+                fatalError("Invalid state: A login callback was received, but no login request was sent.")
+            }
+            guard let appleIDToken = appleIDCredential.identityToken else {
+                print("Unable to fetch identity token")
+                return
+            }
+            guard let idTokenString = String(data: appleIDToken, encoding: .utf8) else {
+                print("Unable to serialize token string from data: \(appleIDToken.debugDescription)")
+                return
+            }
+            
+            let credential = OAuthProvider.appleCredential(withIDToken: idTokenString,
+                                                           rawNonce: nonce,
+                                                           fullName: appleIDCredential.fullName)
+            
+            isLoading = true
+            Auth.auth().signIn(with: credential) { [weak self] (authResult, error) in
+                self?.isLoading = false
+                if let error = error {
+                    print("❌ Firebase Authentication Error:")
+                    print("Error Code: \(error._code)")
+                    print("Error Domain: \((error as NSError).domain)")
+                    print("Description: \(error.localizedDescription)")
+                    print("Full Error: \(error)")
+                    return
+                }
+                print("✅ User signed in with Apple successfully!")
+            }
+        }
+    }
+    
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        print("❌ Apple Sign-In Error:")
+        print("Description: \(error.localizedDescription)")
+        print("Full Error: \(error)")
+        isLoading = false
+    }
+}
+
+extension AuthService: ASAuthorizationControllerPresentationContextProviding {
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        guard let window = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .flatMap({ $0.windows })
+            .first(where: { $0.isKeyWindow }) else {
+            return ASPresentationAnchor()
+        }
+        return window
     }
 }

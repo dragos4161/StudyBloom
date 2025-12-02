@@ -13,6 +13,7 @@ import FirebaseCore
 struct StudyBloomApp: App {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("isDarkMode") private var isDarkMode = false
+    @StateObject private var authService = AuthService()
     
     init() {
         FirebaseApp.configure()
@@ -20,14 +21,19 @@ struct StudyBloomApp: App {
     
     var body: some Scene {
         WindowGroup {
-            if hasCompletedOnboarding {
-                HomeViewWithTestButton()
+            if authService.isAuthenticated {
+                if hasCompletedOnboarding {
+                    HomeViewWithTestButton()
+                } else {
+                    OnboardingView()
+                }
             } else {
-                OnboardingView()
+                LoginView()
             }
         }
         .modelContainer(for: [Chapter.self, StudyPlan.self, DailyLog.self])
         .environment(\.colorScheme, isDarkMode ? .dark : .light)
+        .environmentObject(authService)
     }
 }
 
