@@ -1,9 +1,9 @@
 import SwiftUI
-import SwiftData
 
 struct DashboardView: View {
-    @Query(sort: \Chapter.orderIndex) private var chapters: [Chapter]
-    @Environment(\.modelContext) var modelContext
+    @EnvironmentObject var dataService: DataService
+    
+    private var chapters: [Chapter] { dataService.chapters }
     @AppStorage("userName") private var userName = ""
     
     var body: some View {
@@ -96,5 +96,5 @@ struct ChapterSummaryCard: View {
 
 #Preview {
     DashboardView()
-        .modelContainer(for: Chapter.self, inMemory: true)
+        .environmentObject(DataService())
 }

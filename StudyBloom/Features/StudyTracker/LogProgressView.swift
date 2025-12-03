@@ -113,7 +113,7 @@ struct LogProgressView: View {
 
 #Preview {
     LogProgressView(
-        chapter: Chapter(title: "Cardiology", totalPages: 120, orderIndex: 0, pagesStudied: 45),
+        chapter: Chapter(userId: "test", title: "Cardiology", totalPages: 120, orderIndex: 0, pagesStudied: 45),
         onSave: { _ in }
     )
 }

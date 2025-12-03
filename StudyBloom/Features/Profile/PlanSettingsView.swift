@@ -1,10 +1,10 @@
 import SwiftUI
-import SwiftData
 
 struct PlanSettingsView: View {
     @Environment(\.dismiss) var dismiss
-    @Environment(\.modelContext) var modelContext
-    @Query private var plans: [StudyPlan]
+    @EnvironmentObject var dataService: DataService
+    
+    private var currentPlan: StudyPlan? { dataService.studyPlan }
     
     @State private var localDailyGoal: Int = 10
     @State private var localFreeDays: Set<Int> = []
@@ -14,9 +14,7 @@ struct PlanSettingsView: View {
         (1, "S"), (2, "M"), (3, "T"), (4, "W"), (5, "T"), (6, "F"), (7, "S")
     ]
     
-    var currentPlan: StudyPlan? {
-        plans.first
-    }
+
     
     var body: some View {
         NavigationView {
@@ -88,22 +86,30 @@ struct PlanSettingsView: View {
 
     
     private func saveSettings() {
+        guard let userId = dataService.currentUserId else { return }
+        
+        var planToSave: StudyPlan
+        
         if let plan = currentPlan {
-            plan.dailyPageGoal = localDailyGoal
-            plan.freeDays = Array(localFreeDays)
-            try? modelContext.save()
+            planToSave = plan
+            planToSave.dailyPageGoal = localDailyGoal
+            planToSave.freeDays = Array(localFreeDays)
         } else {
-            let newPlan = StudyPlan(
+            planToSave = StudyPlan(
+                userId: userId,
                 dailyPageGoal: localDailyGoal,
                 freeDays: Array(localFreeDays)
             )
-            modelContext.insert(newPlan)
         }
-        dismiss()
+        
+        Task {
+            try? await dataService.saveStudyPlan(planToSave)
+            dismiss()
+        }
     }
 }
 
 #Preview {
     PlanSettingsView()
-        .modelContainer(for: StudyPlan.self, inMemory: true)
+        .environmentObject(DataService())
 }

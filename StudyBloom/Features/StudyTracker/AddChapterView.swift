@@ -1,10 +1,10 @@
 import SwiftUI
-import SwiftData
 
 struct AddChapterView: View {
     @Environment(\.dismiss) var dismiss
-    @Environment(\.modelContext) var modelContext
-    @Query private var chapters: [Chapter]
+    @EnvironmentObject var dataService: DataService
+    
+    private var chapters: [Chapter] { dataService.chapters }
     
     @State private var title = ""
     @State private var totalPages = ""
@@ -68,20 +68,28 @@ struct AddChapterView: View {
     
     private func saveChapter() {
         guard let pages = Int(totalPages) else { return }
+        guard let userId = dataService.currentUserId else { return }
         
         // Calculate order index (append to end)
         let maxOrderIndex = chapters.map { $0.orderIndex }.max() ?? -1
         let newOrderIndex = maxOrderIndex + 1
         
         let newChapter = Chapter(
+            userId: userId,
             title: title,
             totalPages: pages,
             orderIndex: newOrderIndex,
             colorHex: selectedColorHex
         )
         
-        modelContext.insert(newChapter)
-        dismiss()
+        Task {
+            do {
+                try await dataService.addChapter(newChapter)
+                dismiss()
+            } catch {
+                print("Error adding chapter: \(error.localizedDescription)")
+            }
+        }
     }
 }
 

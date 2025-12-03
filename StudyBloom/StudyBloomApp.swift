@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import SwiftData
 import FirebaseCore
 
 @main
@@ -14,6 +13,7 @@ struct StudyBloomApp: App {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("isDarkMode") private var isDarkMode = false
     @StateObject private var authService = AuthService()
+    @StateObject private var dataService = DataService()
     
     init() {
         FirebaseApp.configure()
@@ -31,9 +31,16 @@ struct StudyBloomApp: App {
                 LoginView()
             }
         }
-        .modelContainer(for: [Chapter.self, StudyPlan.self, DailyLog.self])
         .environment(\.colorScheme, isDarkMode ? .dark : .light)
         .environmentObject(authService)
+        .environmentObject(dataService)
+        .onChange(of: authService.user?.id) { _, userId in
+            if let userId = userId {
+                dataService.initializeForUser(userId: userId)
+            } else {
+                dataService.removeListeners()
+            }
+        }
     }
 }
 

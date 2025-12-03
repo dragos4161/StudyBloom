@@ -1,9 +1,9 @@
 import SwiftUI
-import SwiftData
 
 struct ChapterListView: View {
-    @Query(sort: \Chapter.orderIndex) private var chapters: [Chapter]
-    @Environment(\.modelContext) var modelContext
+    @EnvironmentObject var dataService: DataService
+    
+    private var chapters: [Chapter] { dataService.chapters }
     
     @State private var selectedChapter: Chapter?
     @State private var isShowingAddChapter = false
@@ -52,8 +52,12 @@ struct ChapterListView: View {
             }
             .sheet(item: $selectedChapter) { chapter in
                 LogProgressView(chapter: chapter) { newPages in
-                    chapter.pagesStudied = newPages
-                    // Auto-save handled by SwiftData context usually, but good to be explicit if needed
+                    var updatedChapter = chapter
+                    updatedChapter.pagesStudied = newPages
+                    
+                    Task {
+                        try? await dataService.updateChapter(updatedChapter)
+                    }
                 }
             }
             .sheet(isPresented: $isShowingAddChapter) {
@@ -66,20 +70,22 @@ struct ChapterListView: View {
         var updatedChapters = chapters
         updatedChapters.move(fromOffsets: source, toOffset: destination)
         
-        // Update orderIndex for all affected chapters
-        for (index, chapter) in updatedChapters.enumerated() {
-            chapter.orderIndex = index
+        Task {
+            try? await dataService.reorderChapters(updatedChapters)
         }
     }
     
     private func deleteChapters(at offsets: IndexSet) {
         for index in offsets {
-            modelContext.delete(chapters[index])
+            let chapter = chapters[index]
+            Task {
+                try? await dataService.deleteChapter(chapter)
+            }
         }
     }
 }
 
 #Preview {
     ChapterListView()
-        .modelContainer(for: Chapter.self, inMemory: true)
+        .environmentObject(DataService())
 }

@@ -1,23 +1,28 @@
 import Foundation
-import SwiftData
 import SwiftUI
 
-@Model
-final class Chapter: Identifiable {
+// MARK: - Chapter Model
+struct Chapter: Identifiable, Codable, Equatable {
     var id: String
+    var userId: String
     var title: String
     var totalPages: Int
     var orderIndex: Int
     var pagesStudied: Int
     var colorHex: String
+    var createdAt: Date?
+    var updatedAt: Date?
     
-    init(id: String = UUID().uuidString, title: String, totalPages: Int, orderIndex: Int, pagesStudied: Int = 0, colorHex: String = "#FFB3BA") {
+    init(id: String = UUID().uuidString, userId: String, title: String, totalPages: Int, orderIndex: Int, pagesStudied: Int = 0, colorHex: String = "#FFB3BA") {
         self.id = id
+        self.userId = userId
         self.title = title
         self.totalPages = totalPages
         self.orderIndex = orderIndex
         self.pagesStudied = pagesStudied
         self.colorHex = colorHex
+        self.createdAt = Date()
+        self.updatedAt = Date()
     }
     
     var color: Color {
@@ -25,35 +30,49 @@ final class Chapter: Identifiable {
     }
 }
 
-@Model
-final class StudyPlan {
+// MARK: - StudyPlan Model
+struct StudyPlan: Identifiable, Codable, Equatable {
+    var id: String?
+    var userId: String
     var dailyPageGoal: Int
     var startDate: Date
     var freeDays: [Int] // 1 = Sunday, 2 = Monday, etc.
+    var createdAt: Date?
+    var updatedAt: Date?
     
-    init(dailyPageGoal: Int = 10, startDate: Date = Date(), freeDays: [Int] = []) {
+    init(id: String? = nil, userId: String, dailyPageGoal: Int = 10, startDate: Date = Date(), freeDays: [Int] = []) {
+        self.id = id
+        self.userId = userId
         self.dailyPageGoal = dailyPageGoal
         self.startDate = startDate
         self.freeDays = freeDays
+        self.createdAt = Date()
+        self.updatedAt = Date()
     }
 }
 
-@Model
-final class DailyLog {
+// MARK: - DailyLog Model
+struct DailyLog: Identifiable, Codable, Equatable {
+    var id: String?
+    var userId: String
     var date: Date
     var pagesLearned: Int
     var chapterId: String
     var isFreeDay: Bool
+    var createdAt: Date?
     
-    init(date: Date, pagesLearned: Int, chapterId: String, isFreeDay: Bool = false) {
+    init(id: String? = nil, userId: String, date: Date, pagesLearned: Int, chapterId: String, isFreeDay: Bool = false) {
+        self.id = id
+        self.userId = userId
         self.date = date
         self.pagesLearned = pagesLearned
         self.chapterId = chapterId
         self.isFreeDay = isFreeDay
+        self.createdAt = Date()
     }
 }
 
-// Helper for Color Hex
+// MARK: - Helper for Color Hex
 extension Color {
     init?(hex: String) {
         var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)

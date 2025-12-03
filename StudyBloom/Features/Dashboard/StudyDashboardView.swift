@@ -1,11 +1,11 @@
 import SwiftUI
-import SwiftData
 
 struct StudyDashboardView: View {
-    @Query(sort: \Chapter.orderIndex) private var chapters: [Chapter]
-    @Query private var plans: [StudyPlan]
-    @Query private var logs: [DailyLog]
-    @Environment(\.modelContext) var modelContext
+    @EnvironmentObject var dataService: DataService
+    
+    private var chapters: [Chapter] { dataService.chapters }
+    private var currentPlan: StudyPlan? { dataService.studyPlan }
+    private var logs: [DailyLog] { dataService.dailyLogs }
     
     @State private var schedule: [Date: [StudyTask]] = [:]
     @State private var selectedDate: Date = Date()
@@ -18,9 +18,7 @@ struct StudyDashboardView: View {
         let chapter: Chapter
     }
     
-    var currentPlan: StudyPlan? {
-        plans.first
-    }
+
     
     var todayTasks: [StudyTask] {
         let calendar = Calendar.current
@@ -28,100 +26,67 @@ struct StudyDashboardView: View {
         return schedule[today] ?? []
     }
     
+    // Main content view - extracted to help compiler
+    private var mainContentView: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                TodayGoalView(
+                    todayTasks: todayTasks,
+                    chapters: chapters,
+                    isFreeDay: { isFreeDay(date: $0) },
+                    isFinished: isFinished,
+                    handleLog: { date, task in handleLog(date: date, task: task) }
+                )
+                
+                ScheduleView(
+                    schedule: schedule,
+                    selectedDate: $selectedDate,
+                    isFreeDay: { isFreeDay(date: $0) },
+                    toggleFreeDay: toggleFreeDay,
+                    onLog: { date in handleLog(date: date) },
+                    logs: logs,
+                    chapters: chapters
+                )
+            }
+            .padding(.vertical)
+        }
+    }
+    
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Header / Today's Goal
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Today's Goal")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        
-                        if todayTasks.isEmpty {
-                            if isFreeDay(date: Date()) {
-                                FreeDayCard()
-                            } else if chapters.isEmpty {
-                                EmptyStateCard(message: "Add chapters to start planning.")
-                            } else if isFinished() {
-                                FinishedCard()
-                            } else {
-                                // Maybe just no tasks for today due to some other reason?
-                                Text("No tasks scheduled.")
-                                    .foregroundStyle(.secondary)
-                            }
-                        } else {
-                            ForEach(todayTasks) { task in
-                                TaskCard(task: task) {
-                                    handleLog(date: Date(), task: task)
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-                    
-                    // Calendar
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack {
-                            Text("Schedule")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                            Spacer()
-                        }
-                        
-                        CalendarGridView(
-                            schedule: schedule,
-                            selectedDate: $selectedDate,
-                            isFreeDay: isFreeDay,
-                            toggleFreeDay: toggleFreeDay,
-                            onLog: { date in
-                                handleLog(date: date)
-                            },
-                            logs: logs,
-                            chapters: chapters
-                        )
-                    }
-                    .padding(.horizontal)
-                }
-                .padding(.vertical)
+            mainContentView
+                .navigationTitle("Study Bloom")
+                .toolbar { toolbarContent }
+                .sheet(isPresented: $isShowingSettings) { settingsSheet }
+                .sheet(item: $selectedLogTarget) { target in logSheet(target: target) }
+                .onAppear { recalculateSchedule() }
+                .onChange(of: logs) { _, _ in recalculateSchedule() }
+                .onChange(of: chapters) { _, _ in recalculateSchedule() }
+        }
+    }
+    
+    // Toolbar content - extracted to help compiler
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarTrailing) {
+            Button(action: { isShowingSettings = true }) {
+                Image(systemName: "gearshape")
             }
-            .navigationTitle("Study Bloom")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { isShowingSettings = true }) {
-                        Image(systemName: "gearshape")
-                    }
-                }
-            }
-            .sheet(isPresented: $isShowingSettings) {
-                PlanSettingsView()
-                    .onDisappear {
-                        recalculateSchedule()
-                    }
-            }
-            .sheet(item: $selectedLogTarget) { target in
-                LogProgressView(chapter: target.chapter) { newPages in
-                    let delta = newPages - target.chapter.pagesStudied
-                    target.chapter.pagesStudied = newPages
-                    
-                    if delta > 0 {
-                        let log = DailyLog(date: target.date, pagesLearned: delta, chapterId: target.chapter.id)
-                        modelContext.insert(log)
-                    }
-                    
-                    // Trigger schedule recalculation
-                    recalculateSchedule()
-                }
-            }
-            .onAppear {
+        }
+    }
+    
+    // Settings sheet - extracted to help compiler
+    private var settingsSheet: some View {
+        PlanSettingsView()
+            .onDisappear {
                 recalculateSchedule()
             }
-            .onChange(of: logs) { _, _ in
-                recalculateSchedule()
-            }
-            .onChange(of: chapters) { _, _ in
-                recalculateSchedule()
-            }
+    }
+    
+    // Log sheet - extracted to help compiler
+    private func logSheet(target: LogTarget) -> some View {
+        LogProgressView(chapter: target.chapter) { newPages in
+            handleProgressUpdate(target: target, newPages: newPages)
         }
     }
     
@@ -155,20 +120,24 @@ struct StudyDashboardView: View {
         let calendar = Calendar.current
         
         // Check if there is already a log for this day
-        if let existingLog = logs.first(where: { calendar.isDate($0.date, inSameDayAs: date) }) {
-            // If it's a free day log, remove it (or toggle off if we want to keep history, but removing is cleaner for "unmarking")
-            // If it's a progress log, we probably shouldn't just overwrite it without warning, but for now let's assume "Mark as Free" overrides.
-            // Actually, let's just update the isFreeDay flag if it exists, or delete if it was ONLY a free day marker.
-            
-            if existingLog.isFreeDay {
-                modelContext.delete(existingLog)
-            } else {
-                existingLog.isFreeDay = true
+        Task {
+            do {
+                if let existingLog = logs.first(where: { calendar.isDate($0.date, inSameDayAs: date) }) {
+                    if existingLog.isFreeDay {
+                        try await dataService.deleteDailyLog(existingLog)
+                    } else {
+                        var updatedLog = existingLog
+                        updatedLog.isFreeDay = true
+                        try await dataService.updateDailyLog(updatedLog)
+                    }
+                } else {
+                    guard let userId = dataService.currentUserId else { return }
+                    let newLog = DailyLog(userId: userId, date: date, pagesLearned: 0, chapterId: "", isFreeDay: true)
+                    try await dataService.addDailyLog(newLog)
+                }
+            } catch {
+                print("Error toggling free day: \(error.localizedDescription)")
             }
-        } else {
-            // Create a new log just to mark it as free
-            let newLog = DailyLog(date: date, pagesLearned: 0, chapterId: "", isFreeDay: true)
-            modelContext.insert(newLog)
         }
         
         // Recalculate will happen via onChange of logs
@@ -194,6 +163,98 @@ struct StudyDashboardView: View {
         if let firstUnfinished = chapters.first(where: { $0.pagesStudied < $0.totalPages }) {
             selectedLogTarget = LogTarget(date: date, chapter: firstUnfinished)
         }
+    }
+    
+    private func handleProgressUpdate(target: LogTarget, newPages: Int) {
+        var updatedChapter = target.chapter
+        let delta = newPages - updatedChapter.pagesStudied
+        updatedChapter.pagesStudied = newPages
+        
+        Task {
+            do {
+                try await dataService.updateChapter(updatedChapter)
+                
+                if delta > 0 {
+                    let log = DailyLog(userId: updatedChapter.userId, date: target.date, pagesLearned: delta, chapterId: updatedChapter.id)
+                    try await dataService.addDailyLog(log)
+                }
+            } catch {
+                print("Error updating progress: \(error.localizedDescription)")
+            }
+        }
+        
+        // Trigger schedule recalculation
+        recalculateSchedule()
+    }
+
+    }
+
+
+struct TodayGoalView: View {
+    let todayTasks: [StudyTask]
+    let chapters: [Chapter]
+    let isFreeDay: (Date) -> Bool
+    let isFinished: () -> Bool
+    let handleLog: (Date, StudyTask) -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Today's Goal")
+                .font(.title2)
+                .fontWeight(.bold)
+            
+            if todayTasks.isEmpty {
+                if isFreeDay(Date()) {
+                    FreeDayCard()
+                } else if chapters.isEmpty {
+                    EmptyStateCard(message: "Add chapters to start planning.")
+                } else if isFinished() {
+                    FinishedCard()
+                } else {
+                    Text("No tasks scheduled.")
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                ForEach(todayTasks) { task in
+                    TaskCard(task: task) {
+                        handleLog(Date(), task)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal)
+    }
+}
+
+struct ScheduleView: View {
+    let schedule: [Date: [StudyTask]]
+    @Binding var selectedDate: Date
+    let isFreeDay: (Date) -> Bool
+    let toggleFreeDay: (Date) -> Void
+    let onLog: (Date) -> Void
+    let logs: [DailyLog]
+    let chapters: [Chapter]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Schedule")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                Spacer()
+            }
+            
+            CalendarGridView(
+                schedule: schedule,
+                selectedDate: $selectedDate,
+                isFreeDay: isFreeDay,
+                toggleFreeDay: toggleFreeDay,
+                onLog: onLog,
+                logs: logs,
+                chapters: chapters
+            )
+        }
+        .padding(.horizontal)
     }
 }
 

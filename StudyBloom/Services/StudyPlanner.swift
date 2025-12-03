@@ -1,5 +1,5 @@
 import Foundation
-import SwiftData
+
 
 struct StudyTask: Identifiable {
     let id = UUID()
