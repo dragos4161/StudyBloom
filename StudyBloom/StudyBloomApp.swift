@@ -23,7 +23,7 @@ struct StudyBloomApp: App {
         WindowGroup {
             if authService.isAuthenticated {
                 if hasCompletedOnboarding {
-                    HomeViewWithTestButton()
+                    HomeView()
                 } else {
                     OnboardingView()
                 }
@@ -39,31 +39,6 @@ struct StudyBloomApp: App {
                 dataService.initializeForUser(userId: userId)
             } else {
                 dataService.removeListeners()
-            }
-        }
-    }
-}
-
-// Temporary wrapper to add test button
-struct HomeViewWithTestButton: View {
-    @State private var showTestView = false
-    
-    var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            HomeView()
-            
-            Button(action: { showTestView = true }) {
-                Image(systemName: "flame.fill")
-                    .font(.title)
-                    .foregroundColor(.white)
-                    .frame(width: 60, height: 60)
-                    .background(Color.orange)
-                    .clipShape(Circle())
-                    .shadow(radius: 4)
-            }
-            .padding()
-            .sheet(isPresented: $showTestView) {
-                UserListTestView()
             }
         }
     }
