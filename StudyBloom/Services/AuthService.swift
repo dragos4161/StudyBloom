@@ -88,6 +88,24 @@ class AuthService: NSObject, ObservableObject {
 }
 
 extension AuthService: ASAuthorizationControllerDelegate {
+    func updateUserName(_ name: String) async throws {
+        guard var currentUser = user else { return }
+        currentUser.name = name
+        
+        // Update local state
+        self.user = currentUser
+        
+        // Update Firebase Profile
+        if let firebaseUser = Auth.auth().currentUser {
+            let changeRequest = firebaseUser.createProfileChangeRequest()
+            changeRequest.displayName = name
+            try await changeRequest.commitChanges()
+        }
+        
+        // Update Firestore
+        try await firebaseService.createOrUpdateUser(currentUser)
+    }
+
     func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
         if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
             guard let nonce = currentNonce else {
@@ -100,6 +118,13 @@ extension AuthService: ASAuthorizationControllerDelegate {
             guard let idTokenString = String(data: appleIDToken, encoding: .utf8) else {
                 print("Unable to serialize token string from data: \(appleIDToken.debugDescription)")
                 return
+            }
+            
+            // Extract name if available (only on first sign in)
+            var fullNameString: String?
+            if let fullName = appleIDCredential.fullName {
+                let formatter = PersonNameComponentsFormatter()
+                fullNameString = formatter.string(from: fullName)
             }
             
             let credential = OAuthProvider.appleCredential(withIDToken: idTokenString,
@@ -122,13 +147,33 @@ extension AuthService: ASAuthorizationControllerDelegate {
                 
                 print("✅ User signed in with Apple successfully!")
                 
-                // Create or update user in Firestore
                 if let firebaseUser = authResult?.user {
+                    // Determine the display name to use
+                    // Priority: 1. Name from Apple Credential (first sign in), 2. Existing Firebase Display Name, 3. Default "Student"
+                    // We use "Student" as a better default than "User"
+                    let displayName = fullNameString ?? firebaseUser.displayName ?? "Student"
+                    
+                    // Update Firebase User Profile if we have a new name and it differs
+                    if let newName = fullNameString, newName != firebaseUser.displayName {
+                        let changeRequest = firebaseUser.createProfileChangeRequest()
+                        changeRequest.displayName = newName
+                        changeRequest.commitChanges { error in
+                            if let error = error {
+                                print("Error updating firebase profile: \(error.localizedDescription)")
+                            }
+                        }
+                    }
+                    
+                    // Create user model for Firestore
                     let user = User(
                         id: firebaseUser.uid,
-                        name: firebaseUser.displayName ?? "User",
+                        name: displayName,
                         email: firebaseUser.email ?? ""
                     )
+                    
+                    // Update local user state immediately
+                    self.user = user
+                    self.isAuthenticated = true
                     
                     Task {
                         do {

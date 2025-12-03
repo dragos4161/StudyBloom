@@ -2,8 +2,6 @@ import SwiftUI
 
 struct ProfileView: View {
     @EnvironmentObject var authService: AuthService
-    @AppStorage("userName") private var userName = ""
-    @AppStorage("userEmail") private var userEmail = ""
     @AppStorage("isDarkMode") private var isDarkMode = false
     
     var body: some View {
@@ -16,15 +14,15 @@ struct ProfileView: View {
                             .frame(width: 50, height: 50)
                             .foregroundColor(.gray)
                         VStack(alignment: .leading) {
-                            Text(userName.isEmpty ? "Student Name" : userName)
+                            Text(authService.user?.name ?? "Student Name")
                                 .font(.headline)
-                            Text(userEmail.isEmpty ? "student@example.com" : userEmail)
+                            Text(authService.user?.email ?? "student@example.com")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }
                     }
                     NavigationLink("Edit Profile") {
-                        Text("Edit Profile View")
+                        EditProfileView()
                     }
                 }
                 
@@ -47,4 +45,5 @@ struct ProfileView: View {
 
 #Preview {
     ProfileView()
+        .environmentObject(AuthService())
 }
