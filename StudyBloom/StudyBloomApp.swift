@@ -21,14 +21,16 @@ struct StudyBloomApp: App {
     
     var body: some Scene {
         WindowGroup {
-            if authService.isAuthenticated {
-                if hasCompletedOnboarding {
+            if hasCompletedOnboarding {
+                if authService.isAuthenticated {
                     HomeView()
                 } else {
-                    OnboardingView()
+                    // User completed onboarding but signed out - show login
+                    LoginView()
                 }
             } else {
-                LoginView()
+                // Show onboarding first (includes sign-in on last page)
+                OnboardingView()
             }
         }
         .environment(\.colorScheme, isDarkMode ? .dark : .light)

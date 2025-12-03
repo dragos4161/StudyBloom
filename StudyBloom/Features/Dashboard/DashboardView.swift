@@ -2,9 +2,9 @@ import SwiftUI
 
 struct DashboardView: View {
     @EnvironmentObject var dataService: DataService
+    @EnvironmentObject var authService: AuthService
     
     private var chapters: [Chapter] { dataService.chapters }
-    @AppStorage("userName") private var userName = ""
     
     var body: some View {
         NavigationView {
@@ -13,7 +13,7 @@ struct DashboardView: View {
                     // Welcome / Overview
                     HStack {
                         VStack(alignment: .leading) {
-                            Text("Welcome Back, \(userName)!")
+                            Text("Welcome Back, \(authService.user?.name ?? "Student")!")
                                 .font(.title2)
                                 .fontWeight(.bold)
                             Text("Here's your study progress.")
@@ -97,4 +97,5 @@ struct ChapterSummaryCard: View {
 #Preview {
     DashboardView()
         .environmentObject(DataService())
+        .environmentObject(AuthService())
 }

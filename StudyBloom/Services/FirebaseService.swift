@@ -58,8 +58,10 @@ class FirebaseService: ObservableObject {
             let document = try await userRef.getDocument()
             
             if document.exists {
-                // User exists - update only the updatedAt timestamp
+                // User exists - update name, email, and timestamp
                 try await userRef.updateData([
+                    "name": user.name,
+                    "email": user.email,
                     "updatedAt": Timestamp(date: Date())
                 ])
                 print("✅ Updated existing user: \(userId)")

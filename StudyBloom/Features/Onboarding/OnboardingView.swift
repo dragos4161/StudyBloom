@@ -2,8 +2,7 @@ import SwiftUI
 
 struct OnboardingView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
-    @AppStorage("userName") private var userName = ""
-    @AppStorage("userEmail") private var userEmail = ""
+    @EnvironmentObject var authService: AuthService
     
     @State private var currentPage = 0
     
@@ -25,10 +24,8 @@ struct OnboardingView: View {
             )
             .tag(1)
             
-            OnboardingInputPage(
-                userName: $userName,
-                userEmail: $userEmail,
-                onFinish: {
+            OnboardingSignInPage(
+                onSignInComplete: {
                     hasCompletedOnboarding = true
                 }
             )
@@ -36,6 +33,11 @@ struct OnboardingView: View {
         }
         .tabViewStyle(.page)
         .indexViewStyle(.page(backgroundDisplayMode: .always))
+        .onChange(of: authService.isAuthenticated) { _, isAuthenticated in
+            if isAuthenticated {
+                hasCompletedOnboarding = true
+            }
+        }
     }
 }
 
@@ -74,45 +76,55 @@ struct OnboardingPage: View {
     }
 }
 
-struct OnboardingInputPage: View {
-    @Binding var userName: String
-    @Binding var userEmail: String
-    var onFinish: () -> Void
+struct OnboardingSignInPage: View {
+    @EnvironmentObject var authService: AuthService
+    var onSignInComplete: () -> Void
     
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
             
-            Text("Let's get to know you")
+            Image(systemName: "person.circle.fill")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 100, height: 100)
+                .foregroundColor(.green)
+                .padding()
+                .background(Color.green.opacity(0.1))
+                .clipShape(Circle())
+            
+            Text("Get Started")
                 .font(.title)
                 .fontWeight(.bold)
             
-            VStack(spacing: 16) {
-                TextField("Your Name", text: $userName)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .textContentType(.name)
-                
-                TextField("Email Address", text: $userEmail)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .textContentType(.emailAddress)
-                    .keyboardType(.emailAddress)
-                    .textInputAutocapitalization(.never)
-            }
-            .padding(.horizontal)
+            Text("Sign in to save your progress and sync across devices.")
+                .font(.body)
+                .multilineTextAlignment(.center)
+                .foregroundColor(.secondary)
+                .padding(.horizontal)
             
-            Button(action: onFinish) {
-                Text("Get Started")
-                    .font(.headline)
+            if authService.isLoading {
+                ProgressView()
+                    .padding()
+            } else {
+                Button(action: {
+                    authService.startSignInWithApple()
+                }) {
+                    HStack {
+                        Image(systemName: "applelogo")
+                            .font(.headline)
+                        Text("Sign in with Apple")
+                            .font(.headline)
+                    }
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.blue)
+                    .background(Color.black)
                     .cornerRadius(12)
+                }
+                .padding(.horizontal)
+                .padding(.top, 20)
             }
-            .disabled(userName.isEmpty || userEmail.isEmpty)
-            .opacity(userName.isEmpty || userEmail.isEmpty ? 0.6 : 1.0)
-            .padding(.horizontal)
-            .padding(.top, 20)
             
             Spacer()
         }
@@ -122,4 +134,5 @@ struct OnboardingInputPage: View {
 
 #Preview {
     OnboardingView()
+        .environmentObject(AuthService())
 }
