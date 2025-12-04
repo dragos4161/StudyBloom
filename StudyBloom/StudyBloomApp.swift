@@ -21,7 +21,10 @@ struct StudyBloomApp: App {
     
     var body: some Scene {
         WindowGroup {
-            if hasCompletedOnboarding {
+            if authService.isCheckingAuth {
+                // Show splash screen while Firebase checks auth state
+                SplashScreenView()
+            } else if hasCompletedOnboarding {
                 if authService.isAuthenticated {
                     HomeView()
                 } else {

@@ -8,6 +8,7 @@ class AuthService: NSObject, ObservableObject {
     @Published var user: User?
     @Published var isAuthenticated = false
     @Published var isLoading = false
+    @Published var isCheckingAuth = true // Track initial auth verification
     
     private var currentNonce: String?
     private let firebaseService = FirebaseService()
@@ -32,6 +33,9 @@ class AuthService: NSObject, ObservableObject {
                 self.user = nil
                 self.isAuthenticated = false
             }
+            
+            // Mark auth check as complete
+            self.isCheckingAuth = false
         }
     }
     
