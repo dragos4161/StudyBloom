@@ -5,14 +5,28 @@ struct EditProfileView: View {
     @Environment(\.dismiss) var dismiss
     
     @State private var name: String = ""
+    @State private var educationLevel: String = "College"
+    @State private var learningFocus: String = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
+    
+    let educationLevels = ["Middle School", "High School", "College", "Med School / Residency", "Other"]
     
     var body: some View {
         Form {
             Section(header: Text("Personal Information")) {
                 TextField("Name", text: $name)
                     .textContentType(.name)
+            }
+            
+            Section(header: Text("Education")) {
+                Picker("Level", selection: $educationLevel) {
+                    ForEach(educationLevels, id: \.self) { level in
+                        Text(level).tag(level)
+                    }
+                }
+                
+                TextField("Learning Focus (e.g. Anatomy)", text: $learningFocus)
             }
             
             if let errorMessage = errorMessage {
@@ -35,6 +49,8 @@ struct EditProfileView: View {
         .onAppear {
             if let user = authService.user {
                 name = user.name
+                educationLevel = user.educationLevel ?? "College"
+                learningFocus = user.learningFocus ?? ""
             }
         }
         .overlay {
@@ -55,7 +71,11 @@ struct EditProfileView: View {
         
         Task {
             do {
-                try await authService.updateUserName(name)
+                try await authService.updateUserProfile(
+                    name: name,
+                    educationLevel: educationLevel,
+                    learningFocus: learningFocus
+                )
                 isLoading = false
                 dismiss()
             } catch {

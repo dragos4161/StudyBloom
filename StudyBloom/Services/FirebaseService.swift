@@ -62,6 +62,8 @@ class FirebaseService: ObservableObject {
                 try await userRef.updateData([
                     "name": user.name,
                     "email": user.email,
+                    "educationLevel": user.educationLevel as Any,
+                    "learningFocus": user.learningFocus as Any,
                     "updatedAt": Timestamp(date: Date())
                 ])
                 print("✅ Updated existing user: \(userId)")

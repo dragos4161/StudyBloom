@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ProfileView: View {
     @EnvironmentObject var authService: AuthService
+    @StateObject private var notificationManager = NotificationManager.shared
     @AppStorage("isDarkMode") private var isDarkMode = false
     
     var body: some View {
@@ -19,6 +20,19 @@ struct ProfileView: View {
                             Text(authService.user?.email ?? "student@example.com")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
+                            
+                            if let education = authService.user?.educationLevel {
+                                Text(education)
+                                    .font(.caption)
+                                    .foregroundColor(.blue)
+                                    .padding(.top, 2)
+                            }
+                            
+                            if let focus = authService.user?.learningFocus, !focus.isEmpty {
+                                Text("Focus: \(focus)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
                         }
                     }
                     NavigationLink("Edit Profile") {
@@ -27,7 +41,7 @@ struct ProfileView: View {
                 }
                 
                 Section(header: Text("Settings")) {
-                    Toggle("Notifications", isOn: .constant(true))
+                    Toggle("Notifications", isOn: $notificationManager.notificationsEnabled)
                     Toggle("Dark Mode", isOn: $isDarkMode)
                 }
                 

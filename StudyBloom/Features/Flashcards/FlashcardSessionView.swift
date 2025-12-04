@@ -83,21 +83,12 @@ struct FlashcardSessionView: View {
                                     .cornerRadius(10)
                             }
                             
-                            Button(action: { processCard(rating: .good) }) {
-                                Label("Good", systemImage: "checkmark")
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color.green.opacity(0.2))
-                                    .foregroundColor(.green)
-                                    .cornerRadius(10)
-                            }
-                            
                             Button(action: { processCard(rating: .easy) }) {
                                 Label("Easy", systemImage: "star.fill")
                                     .frame(maxWidth: .infinity)
                                     .padding()
-                                    .background(Color.blue.opacity(0.2))
-                                    .foregroundColor(.blue)
+                                    .background(Color.green.opacity(0.2)) // Changed to green for positive reinforcement
+                                    .foregroundColor(.green)
                                     .cornerRadius(10)
                             }
                         }
@@ -144,11 +135,9 @@ struct FlashcardSessionView: View {
         case .again:
             updatedCard.interval = 0
             updatedCard.repetition = 0
-        case .good:
-            updatedCard.interval = max(1, Int(Double(updatedCard.interval == 0 ? 1 : updatedCard.interval) * 1.5))
-            updatedCard.repetition += 1
         case .easy:
-            updatedCard.interval = max(4, Int(Double(updatedCard.interval == 0 ? 1 : updatedCard.interval) * 2.5))
+            // Boost interval significantly
+            updatedCard.interval = max(3, Int(Double(updatedCard.interval == 0 ? 1 : updatedCard.interval) * 2.5))
             updatedCard.repetition += 1
         }
         
@@ -170,7 +159,7 @@ struct FlashcardSessionView: View {
     }
     
     enum Rating {
-        case again, good, easy
+        case again, easy
     }
 }
 

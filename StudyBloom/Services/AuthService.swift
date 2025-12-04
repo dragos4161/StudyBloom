@@ -88,14 +88,16 @@ class AuthService: NSObject, ObservableObject {
 }
 
 extension AuthService: ASAuthorizationControllerDelegate {
-    func updateUserName(_ name: String) async throws {
+    func updateUserProfile(name: String, educationLevel: String?, learningFocus: String?) async throws {
         guard var currentUser = user else { return }
         currentUser.name = name
+        currentUser.educationLevel = educationLevel
+        currentUser.learningFocus = learningFocus
         
         // Update local state
         self.user = currentUser
         
-        // Update Firebase Profile
+        // Update Firebase Profile (Display Name only)
         if let firebaseUser = Auth.auth().currentUser {
             let changeRequest = firebaseUser.createProfileChangeRequest()
             changeRequest.displayName = name

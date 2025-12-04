@@ -9,13 +9,15 @@ class GenerationViewModel: ObservableObject {
     
     private let aiService: AIServiceProtocol
     private let pdfService = PDFService.shared
+    private let authService: AuthService
     
     // Temporary storage for API Key - in production this should be secure
     var apiKey: String = ""
     
-    init(aiService: AIServiceProtocol? = nil) {
+    init(aiService: AIServiceProtocol? = nil, authService: AuthService = AuthService()) {
         // Default to OpenAIService with empty key, will be updated when user provides key
         self.aiService = aiService ?? OpenAIService(apiKey: "")
+        self.authService = authService
     }
     
     func generateFlashcards(from pdfUrl: URL, count: Int) async {
@@ -48,8 +50,19 @@ class GenerationViewModel: ObservableObject {
         // Truncate text if too long (simple approach for MVP)
         let truncatedText = String(text.prefix(15000)) // Approx 4-5k tokens
         
+        var contextInfo = ""
+        if let user = authService.user {
+            if let level = user.educationLevel {
+                contextInfo += "Target Audience: \(level).\n"
+            }
+            if let focus = user.learningFocus, !focus.isEmpty {
+                contextInfo += "Focus On: \(focus).\n"
+            }
+        }
+        
         let prompt = """
         Generate \(count) flashcards based on the following text.
+        \(contextInfo)
         Return a JSON object with a key "flashcards" containing an array of objects.
         Each object must have "front" (question) and "back" (answer) keys.
         Do not include any other text.

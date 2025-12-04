@@ -297,6 +297,11 @@ class DataService: ObservableObject {
         do {
             try docRef.setData(from: newLog)
             print("✅ Added daily log")
+            
+            // Notify NotificationManager about study activity
+            DispatchQueue.main.async {
+                NotificationManager.shared.userDidStudy(pages: newLog.pagesLearned)
+            }
         } catch {
             print("❌ Error adding daily log: \(error.localizedDescription)")
             throw error
@@ -317,6 +322,11 @@ class DataService: ObservableObject {
         do {
             try docRef.setData(from: log, merge: true)
             print("✅ Updated daily log")
+            
+            // Notify NotificationManager about study activity
+            DispatchQueue.main.async {
+                NotificationManager.shared.userDidStudy(pages: log.pagesLearned)
+            }
         } catch {
             print("❌ Error updating daily log: \(error.localizedDescription)")
             throw error
