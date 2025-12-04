@@ -2,9 +2,10 @@ import Foundation
 
 struct Flashcard: Identifiable, Codable {
     let id: String
-    let userId: String
-    let front: String
-    let back: String
+    var userId: String
+    var front: String
+    var back: String
+    var chapterId: String? // Optional link to a specific chapter
     
     // Spaced Repetition fields
     var interval: Int = 0 // Days until next review

@@ -13,6 +13,11 @@ struct HomeView: View {
                     Label("Study", systemImage: "book.fill")
                 }
             
+            FlashcardDeckView()
+                .tabItem {
+                    Label("Flashcards", systemImage: "rectangle.on.rectangle.angled")
+                }
+            
             ChapterListView()
                 .tabItem {
                     Label("Chapters", systemImage: "list.bullet")
