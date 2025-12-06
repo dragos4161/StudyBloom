@@ -61,6 +61,18 @@ class StudyPlanner {
                 continue
             }
             
+            // CHECK: If scheduling for Today, check if we already finished a chapter today.
+            // If so, we skip Today effectively (currentDate ++).
+            if calendar.isDateInToday(currentDate) {
+                 let todayLogs = logs.filter { calendar.isDate($0.date, inSameDayAs: currentDate) && !$0.isFreeDay }
+                 if let log = todayLogs.first, let finishedChapter = chapters.first(where: { $0.id == log.chapterId }), finishedChapter.pagesStudied >= finishedChapter.totalPages {
+                     // We finished a chapter today! Don't schedule more.
+                     currentDate = calendar.date(byAdding: .day, value: 1, to: currentDate)!
+                     daysProcessed += 1
+                     continue
+                 }
+            }
+            
             // Allocate pages
             var dailyCapacity = plan.dailyPageGoal
             var tasksForDay: [StudyTask] = []

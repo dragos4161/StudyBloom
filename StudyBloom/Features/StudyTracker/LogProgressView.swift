@@ -2,71 +2,123 @@ import SwiftUI
 
 struct LogProgressView: View {
     @Environment(\.dismiss) var dismiss
-    @State private var pagesRead: Double = 0
+    @AppStorage("isDarkMode") private var isDarkMode = false
+    
+    @State private var pagesToAdd: Double = 0
     @State private var isSaving = false
     
     let chapter: Chapter
     let onSave: (Int) -> Void
     
+    // Limits
+    private var maxPagesToAdd: Double {
+        Double(max(0, chapter.totalPages - chapter.pagesStudied))
+    }
+    
     var body: some View {
         ZStack {
-            // Background Gradient
-            LinearGradient(colors: [Color.blue.opacity(0.1), Color.purple.opacity(0.1)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            // Background Layer
+            Color(uiColor: .systemBackground)
                 .ignoresSafeArea()
             
             VStack(spacing: 30) {
                 // Header
-                VStack(spacing: 8) {
+                VStack(spacing: 4) {
                     Text("Log Progress")
-                        .font(.system(size: 16, weight: .medium, design: .rounded))
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                     
                     Text(chapter.title)
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .font(.headline)
                         .multilineTextAlignment(.center)
                 }
-                .padding(.top, 20)
+                .padding(.top, 60)
                 
-                Spacer()
-                
-                // Circular Progress Interaction
+                // Dual Ring Visualization
                 ZStack {
+                    // --- OUTER RING: TOTAL PROGRESS ---
+                    // Track
                     Circle()
-                        .stroke(Color.gray.opacity(0.2), lineWidth: 20)
-                        .frame(width: 250, height: 250)
+                        .stroke(Color.gray.opacity(0.1), lineWidth: 12)
+                        .frame(width: 220, height: 220)
                     
+                    // Fill (Current + Added)
                     Circle()
-                        .trim(from: 0, to: pagesRead / Double(chapter.totalPages))
+                        .trim(from: 0, to: (Double(chapter.pagesStudied) + pagesToAdd) / Double(chapter.totalPages))
                         .stroke(
-                            AngularGradient(colors: [.blue, .purple], center: .center),
-                            style: StrokeStyle(lineWidth: 20, lineCap: .round)
+                            Color.blue,
+                            style: StrokeStyle(lineWidth: 12, lineCap: .round)
                         )
-                        .frame(width: 250, height: 250)
                         .rotationEffect(.degrees(-90))
-                        .animation(.spring(response: 0.6, dampingFraction: 0.7), value: pagesRead)
+                        .frame(width: 220, height: 220)
+                        .animation(.spring(response: 0.4), value: pagesToAdd)
                     
-                    VStack {
-                        Text("\(Int(pagesRead))")
-                            .font(.system(size: 64, weight: .heavy, design: .rounded))
-                            .contentTransition(.numericText(value: pagesRead))
+                    // --- INNER RING: SESSION EFFORT ---
+                    // Track
+                    Circle()
+                        .stroke(Color.gray.opacity(0.1), lineWidth: 12)
+                        .frame(width: 190, height: 190) // Increased size to reduce gap
+                    
+                    // Fill (Session % of Remaining)
+                    Circle()
+                        .trim(from: 0, to: maxPagesToAdd > 0 ? pagesToAdd / maxPagesToAdd : 0)
+                        .stroke(
+                            Color.purple,
+                            style: StrokeStyle(lineWidth: 12, lineCap: .round)
+                        )
+                        .rotationEffect(.degrees(-90))
+                        .frame(width: 190, height: 190)
+                        .animation(.spring(response: 0.4), value: pagesToAdd)
+                    
+                    // Center Text
+                    VStack(spacing: 2) {
+                        Text("+\(Int(pagesToAdd))")
+                            .font(.system(size: 48, weight: .bold, design: .rounded))
+                            .contentTransition(.numericText(value: pagesToAdd))
+                            .foregroundStyle(.purple)
                         Text("pages")
-                            .font(.headline)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.vertical, 10)
+                
+                // Status Text
+                HStack(spacing: 40) {
+                    VStack(spacing: 2) {
+                        Text("Current Limit")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                        Text("\(chapter.pagesStudied + Int(pagesToAdd))")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.blue)
+                    }
+                    
+                    VStack(spacing: 2) {
+                        Text("Total Goal")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                        Text("\(chapter.totalPages)")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.gray)
                     }
                 }
                 
                 // Slider Control
-                VStack(spacing: 10) {
-                    Slider(value: $pagesRead, in: 0...Double(chapter.totalPages), step: 1)
-                        .tint(.purple)
-                    
-                    HStack {
-                        Text("0")
-                        Spacer()
-                        Text("\(chapter.totalPages)")
+                VStack(spacing: 12) {
+                    if maxPagesToAdd > 0 {
+                        Slider(value: $pagesToAdd, in: 0...maxPagesToAdd, step: 1)
+                            .tint(.purple)
+                    } else {
+                        Text("Goal Achieved! 🎉")
+                            .font(.headline)
+                            .foregroundStyle(.green)
+                            .padding(.vertical, 10)
                     }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 40)
                 
@@ -75,9 +127,11 @@ struct LogProgressView: View {
                 // Save Button
                 Button(action: {
                     isSaving = true
-                    // Simulate network delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        onSave(Int(pagesRead))
+                    // Calculate new total
+                    let newTotal = chapter.pagesStudied + Int(pagesToAdd)
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        onSave(newTotal)
                         dismiss()
                     }
                 }) {
@@ -86,28 +140,26 @@ struct LogProgressView: View {
                             ProgressView()
                                 .tint(.white)
                         } else {
-                            Text("Save Progress")
+                            Text("Add Logs")
                                 .fontWeight(.bold)
-                            Image(systemName: "checkmark.circle.fill")
                         }
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(
-                        LinearGradient(colors: [.blue, .purple], startPoint: .leading, endPoint: .trailing)
-                    )
+                    .background(LinearGradient(colors: [.blue, .purple], startPoint: .leading, endPoint: .trailing))
                     .foregroundColor(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-                    .shadow(color: .blue.opacity(0.3), radius: 10, x: 0, y: 5)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: .purple.opacity(0.3), radius: 8, y: 4)
                 }
                 .padding(.horizontal, 30)
-                .padding(.bottom, 20)
+                .padding(.bottom, 30)
+                .disabled(pagesToAdd == 0)
+                .opacity(pagesToAdd == 0 ? 0.6 : 1.0)
             }
         }
-        .onAppear {
-            // Initialize with current progress
-            pagesRead = Double(chapter.pagesStudied)
-        }
+        .presentationDetents([.fraction(0.75)]) // Taller sheet
+        .presentationDragIndicator(.visible)
+        .preferredColorScheme(isDarkMode ? .dark : .light)
     }
 }
 

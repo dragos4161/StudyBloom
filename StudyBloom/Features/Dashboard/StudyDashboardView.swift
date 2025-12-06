@@ -11,6 +11,7 @@ struct StudyDashboardView: View {
     @State private var selectedDate: Date = Date()
     @State private var isShowingSettings = false
     @State private var selectedLogTarget: LogTarget?
+    @State private var selectedDayInfo: DayInfo? // New state for detail sheet
     
     struct LogTarget: Identifiable {
         let id = UUID()
@@ -35,6 +36,10 @@ struct StudyDashboardView: View {
                     chapters: chapters,
                     isFreeDay: { isFreeDay(date: $0) },
                     isFinished: isFinished,
+                    hasLoggedToday: { 
+                        let calendar = Calendar.current
+                        return logs.contains { calendar.isDateInToday($0.date) && !$0.isFreeDay }
+                    },
                     handleLog: { date, task in handleLog(date: date, task: task) }
                 )
                 
@@ -45,7 +50,11 @@ struct StudyDashboardView: View {
                     toggleFreeDay: toggleFreeDay,
                     onLog: { date in handleLog(date: date) },
                     logs: logs,
-                    chapters: chapters
+                    chapters: chapters,
+                    onSelectDay: { dayInfo in
+                        selectedDayInfo = dayInfo
+                    },
+                    plan: currentPlan
                 )
             }
             .padding(.vertical)
@@ -59,6 +68,40 @@ struct StudyDashboardView: View {
                 .toolbar { toolbarContent }
                 .sheet(isPresented: $isShowingSettings) { settingsSheet }
                 .sheet(item: $selectedLogTarget) { target in logSheet(target: target) }
+                .sheet(item: $selectedDayInfo) { dayInfo in
+                    DayDetailView(
+                        dayInfo: dayInfo,
+                        onAddLog: {
+                            // Close detail, open log sheet
+                            selectedDayInfo = nil
+                            
+                            // Delay presentation of new sheet to allow dismissal animation
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                // Create a target. If there is a scheduled task, use it. Otherwise use the chapter from day info or fallback.
+                                if let task = dayInfo.scheduledTask,
+                                   let chapter = chapters.first(where: { $0.id == task.chapterId }) {
+                                    selectedLogTarget = LogTarget(date: dayInfo.date, chapter: chapter)
+                                } else if let chapterTitle = dayInfo.chapterTitle,
+                                          let chapter = chapters.first(where: { $0.title == chapterTitle }) {
+                                    selectedLogTarget = LogTarget(date: dayInfo.date, chapter: chapter)
+                                } else if let firstUnfinished = chapters.first(where: { $0.pagesStudied < $0.totalPages }) {
+                                    selectedLogTarget = LogTarget(date: dayInfo.date, chapter: firstUnfinished)
+                                }
+                            }
+                        },
+                        onToggleFreeDay: {
+                            toggleFreeDay(dayInfo.date)
+                            selectedDayInfo = nil
+                        },
+                        onDeleteLog: { log in
+                            deleteLog(log)
+                            // We might keep the sheet open and let it refresh?
+                            // But DayInfo is immutable. So simple approach is close it or we need to reload it.
+                            // For MVP, closing it is safest to ensure state refresh.
+                            selectedDayInfo = nil 
+                        }
+                    )
+                }
                 .onAppear { recalculateSchedule() }
                 .onChange(of: logs) { _, _ in recalculateSchedule() }
                 .onChange(of: chapters) { _, _ in recalculateSchedule() }
@@ -143,6 +186,25 @@ struct StudyDashboardView: View {
         // Recalculate will happen via onChange of logs
     }
     
+    private func deleteLog(_ log: DailyLog) {
+        Task {
+            do {
+                // 1. Revert progress if it wasn't a free day marking
+                if !log.isFreeDay {
+                    if var chapter = chapters.first(where: { $0.id == log.chapterId }) {
+                        chapter.pagesStudied = max(0, chapter.pagesStudied - log.pagesLearned)
+                        try await dataService.updateChapter(chapter)
+                    }
+                }
+                
+                // 2. Delete the log
+                try await dataService.deleteDailyLog(log)
+            } catch {
+                print("Error deleting log: \(error.localizedDescription)")
+            }
+        }
+    }
+    
     private func handleLog(date: Date, task: StudyTask? = nil) {
         let calendar = Calendar.current
         
@@ -195,6 +257,7 @@ struct TodayGoalView: View {
     let chapters: [Chapter]
     let isFreeDay: (Date) -> Bool
     let isFinished: () -> Bool
+    let hasLoggedToday: () -> Bool
     let handleLog: (Date, StudyTask) -> Void
     
     var body: some View {
@@ -210,6 +273,8 @@ struct TodayGoalView: View {
                     EmptyStateCard(message: "Add chapters to start planning.")
                 } else if isFinished() {
                     FinishedCard()
+                } else if hasLoggedToday() {
+                    DailyGoalFinishedCard()
                 } else {
                     Text("No tasks scheduled.")
                         .foregroundStyle(.secondary)
@@ -234,6 +299,9 @@ struct ScheduleView: View {
     let onLog: (Date) -> Void
     let logs: [DailyLog]
     let chapters: [Chapter]
+    // New props to pass to CalendarGridView and handle selection
+    let onSelectDay: (DayInfo) -> Void
+    let plan: StudyPlan?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -247,11 +315,10 @@ struct ScheduleView: View {
             CalendarGridView(
                 schedule: schedule,
                 selectedDate: $selectedDate,
-                isFreeDay: isFreeDay,
-                toggleFreeDay: toggleFreeDay,
-                onLog: onLog,
                 logs: logs,
-                chapters: chapters
+                chapters: chapters,
+                plan: plan,
+                onSelectDay: onSelectDay
             )
         }
         .padding(.horizontal)
@@ -350,12 +417,10 @@ struct FinishedCard: View {
 struct CalendarGridView: View {
     let schedule: [Date: [StudyTask]]
     @Binding var selectedDate: Date
-    let isFreeDay: (Date) -> Bool
-    let toggleFreeDay: (Date) -> Void
-    let onLog: (Date) -> Void
-    // New dependencies for past logs
     let logs: [DailyLog]
     let chapters: [Chapter]
+    let plan: StudyPlan?
+    let onSelectDay: (DayInfo) -> Void
     
     @State private var currentMonth: Date = Date()
     
@@ -432,61 +497,21 @@ struct CalendarGridView: View {
                 }
                 
                 ForEach(days, id: \.self) { date in
-                    let tasks = schedule[date] ?? []
-                    let isToday = calendar.isDateInToday(date)
-                    let isFree = isFreeDay(date)
+                    let dayInfo = CalendarHelper.getDayInfo(
+                        for: date,
+                        schedule: schedule,
+                        logs: logs,
+                        chapters: chapters,
+                        plan: plan
+                    )
                     
-                    // Check for past logs
-                    let logForDay = logs.first { calendar.isDate($0.date, inSameDayAs: date) && !$0.isFreeDay }
-                    let chapterColor: String? = {
-                        if let log = logForDay, let chapter = chapters.first(where: { $0.id == log.chapterId }) {
-                            return chapter.colorHex
-                        }
-                        if let firstTask = tasks.first {
-                            return firstTask.colorHex
-                        }
-                        return nil
-                    }()
-                    
-                    ZStack {
-                        if isFree {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.blue.opacity(0.1))
-                                .overlay(
-                                    Image(systemName: "sparkles")
-                                        .font(.caption)
-                                        .foregroundColor(.blue)
-                                )
-                        } else if let color = chapterColor {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color(hex: color) ?? .gray)
-                        } else {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.gray.opacity(0.1))
-                        }
-                        
-                        Text("\(calendar.component(.day, from: date))")
-                            .font(.caption)
-                            .fontWeight(isToday ? .bold : .regular)
-                            .foregroundStyle(isToday ? .white : ((tasks.isEmpty && logForDay == nil) && !isFree ? .primary : .white))
-                            .shadow(radius: (tasks.isEmpty && logForDay == nil) && !isFree ? 0 : 1)
-                    }
-                    .frame(height: 40)
+                    CalendarDayCell(
+                        dayInfo: dayInfo,
+                        isSelected: calendar.isDate(date, inSameDayAs: selectedDate)
+                    )
                     .onTapGesture {
                         selectedDate = date
-                    }
-                    .contextMenu {
-                        Button {
-                            onLog(date)
-                        } label: {
-                            Label("Log Progress", systemImage: "pencil")
-                        }
-                        
-                        Button {
-                            toggleFreeDay(date)
-                        } label: {
-                            Label(isFree ? "Remove Free Day" : "Mark as Free Day", systemImage: isFree ? "calendar.badge.minus" : "sparkles")
-                        }
+                        onSelectDay(dayInfo)
                     }
                 }
             }
@@ -507,5 +532,25 @@ struct CalendarGridView: View {
                     }
             )
         }
+    }
+}
+
+struct DailyGoalFinishedCard: View {
+    var body: some View {
+        HStack {
+            Image(systemName: "star.fill")
+                .font(.largeTitle)
+                .foregroundStyle(.yellow)
+            VStack(alignment: .leading) {
+                Text("Daily Goal Met!")
+                    .font(.headline)
+                Text("Great job! Continue tomorrow.")
+                    .font(.caption)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.yellow.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 }
