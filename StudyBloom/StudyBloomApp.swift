@@ -14,6 +14,7 @@ struct StudyBloomApp: App {
     @AppStorage("isDarkMode") private var isDarkMode = false
     @StateObject private var authService = AuthService()
     @StateObject private var dataService = DataService()
+    @StateObject private var badgeManager = BadgeManager.shared
     
     init() {
         FirebaseApp.configure()
@@ -39,6 +40,7 @@ struct StudyBloomApp: App {
         .environment(\.colorScheme, isDarkMode ? .dark : .light)
         .environmentObject(authService)
         .environmentObject(dataService)
+        .environmentObject(badgeManager)
         .onChange(of: authService.user?.id) { _, userId in
             if let userId = userId {
                 dataService.initializeForUser(userId: userId)

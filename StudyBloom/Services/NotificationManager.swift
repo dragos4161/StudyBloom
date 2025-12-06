@@ -95,4 +95,59 @@ class NotificationManager: ObservableObject {
         
         UNUserNotificationCenter.current().add(request)
     }
+    
+    // MARK: - Social Notifications
+    
+    func notifyFriendRequest(from userName: String) {
+        guard notificationsEnabled else { return }
+        
+        let content = UNMutableNotificationContent()
+        content.title = "New Friend Request"
+        content.body = "\(userName) wants to be friends!"
+        content.sound = .default
+        
+        let request = UNNotificationRequest(
+            identifier: "friend_request_\(UUID())",
+            content: content,
+            trigger: nil // Deliver immediately
+        )
+        UNUserNotificationCenter.current().add(request)
+        
+        // Update badge
+        Task {
+            await BadgeManager.shared.updateFriendRequestBadge()
+        }
+    }
+    
+    func notifyFriendshipAccepted(userName: String) {
+        guard notificationsEnabled else { return }
+        
+        let content = UNMutableNotificationContent()
+        content.title = "Friend Request Accepted"
+        content.body = "\(userName) accepted your friend request!"
+        content.sound = .default
+        
+        let request = UNNotificationRequest(
+            identifier: "friend_accepted_\(UUID())",
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().add(request)
+    }
+    
+    func notifyDeckShared(deckName: String, from userName: String) {
+        guard notificationsEnabled else { return }
+        
+        let content = UNMutableNotificationContent()
+        content.title = "New Shared Deck"
+        content.body = "\(userName) shared \"\(deckName)\" with you!"
+        content.sound = .default
+        
+        let request = UNNotificationRequest(
+            identifier: "deck_shared_\(UUID())",
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().add(request)
+    }
 }

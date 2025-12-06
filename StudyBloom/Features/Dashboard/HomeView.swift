@@ -3,6 +3,7 @@ import SwiftUI
 struct HomeView: View {
     @Environment(\.horizontalSizeClass) var sizeClass
     @State private var selection: NavigationItem? = .home
+    @EnvironmentObject var badgeManager: BadgeManager
     
     // For TabView binding (requires non-optional)
     @State private var tabSelection: NavigationItem = .home
@@ -12,6 +13,8 @@ struct HomeView: View {
         case study = "Study"
         case flashcards = "Flashcards"
         case chapters = "Chapters"
+        case social = "Social"
+        case analytics = "Analytics"
         case profile = "Profile"
         
         var id: String { self.rawValue }
@@ -22,6 +25,8 @@ struct HomeView: View {
             case .study: return "book.fill"
             case .flashcards: return "rectangle.on.rectangle.angled"
             case .chapters: return "list.bullet"
+            case .social: return "person.2.fill"
+            case .analytics: return "chart.bar.fill"
             case .profile: return "person"
             }
         }
@@ -56,6 +61,19 @@ struct HomeView: View {
                 .tag(NavigationItem.chapters)
                 
                 NavigationStack {
+                    SocialView()
+                }
+                .tabItem { Label("Social", systemImage: "person.2.fill") }
+                .tag(NavigationItem.social)
+                .badge(badgeManager.friendRequestCount)
+                
+                NavigationStack {
+                    AnalyticsView()
+                }
+                .tabItem { Label("Analytics", systemImage: "chart.bar.fill") }
+                .tag(NavigationItem.analytics)
+                
+                NavigationStack {
                     ProfileView()
                 }
                 .tabItem { Label("Profile", systemImage: "person") }
@@ -77,6 +95,8 @@ struct HomeView: View {
                 case .study: StudyDashboardView()
                 case .flashcards: FlashcardDeckView()
                 case .chapters: ChapterListView()
+                case .social: SocialView()
+                case .analytics: AnalyticsView()
                 case .profile: ProfileView()
                 }
             }
