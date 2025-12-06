@@ -9,18 +9,18 @@ struct StudyDashboardView: View {
     
     @State private var schedule: [Date: [StudyTask]] = [:]
     @State private var selectedDate: Date = Date()
+    @State private var isShowingTimer = false
+    
     @State private var isShowingSettings = false
     @State private var selectedLogTarget: LogTarget?
-    @State private var selectedDayInfo: DayInfo? // New state for detail sheet
+    @State private var selectedDayInfo: DayInfo?
     
     struct LogTarget: Identifiable {
         let id = UUID()
         let date: Date
         let chapter: Chapter
     }
-    
 
-    
     var todayTasks: [StudyTask] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
@@ -112,14 +112,11 @@ struct StudyDashboardView: View {
             .sheet(item: $selectedLogTarget) { target in logSheet(target: target) }
             .sheet(item: $selectedDayInfo) { dayInfo in
                 DayDetailView(
+                    // ... existing closure content ...
                     dayInfo: dayInfo,
                     onAddLog: {
-                        // Close detail, open log sheet
                         selectedDayInfo = nil
-                        
-                        // Delay presentation of new sheet to allow dismissal animation
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            // Create a target. If there is a scheduled task, use it. Otherwise use the chapter from day info or fallback.
                             if let task = dayInfo.scheduledTask,
                                let chapter = chapters.first(where: { $0.id == task.chapterId }) {
                                 selectedLogTarget = LogTarget(date: dayInfo.date, chapter: chapter)
@@ -137,24 +134,29 @@ struct StudyDashboardView: View {
                     },
                     onDeleteLog: { log in
                         deleteLog(log)
-                        // We might keep the sheet open and let it refresh?
-                        // But DayInfo is immutable. So simple approach is close it or we need to reload it.
-                        // For MVP, closing it is safest to ensure state refresh.
                         selectedDayInfo = nil 
                     }
                 )
+            }
+            .fullScreenCover(isPresented: $isShowingTimer) {
+                PomodoroView()
             }
             .onAppear { recalculateSchedule() }
             .onChange(of: logs) { _, _ in recalculateSchedule() }
             .onChange(of: chapters) { _, _ in recalculateSchedule() }
     }
     
-    // Toolbar content - extracted to help compiler
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .navigationBarTrailing) {
-            Button(action: { isShowingSettings = true }) {
-                Image(systemName: "gearshape")
+            HStack {
+                Button(action: { isShowingTimer = true }) {
+                    Image(systemName: "timer")
+                }
+                
+                Button(action: { isShowingSettings = true }) {
+                    Image(systemName: "gearshape")
+                }
             }
         }
     }
