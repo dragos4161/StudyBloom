@@ -28,84 +28,125 @@ struct StudyDashboardView: View {
     }
     
     // Main content view - extracted to help compiler
+    @Environment(\.horizontalSizeClass) var sizeClass
+    
     private var mainContentView: some View {
         ScrollView {
-            VStack(spacing: 24) {
-                TodayGoalView(
-                    todayTasks: todayTasks,
-                    chapters: chapters,
-                    isFreeDay: { isFreeDay(date: $0) },
-                    isFinished: isFinished,
-                    hasLoggedToday: { 
-                        let calendar = Calendar.current
-                        return logs.contains { calendar.isDateInToday($0.date) && !$0.isFreeDay }
-                    },
-                    handleLog: { date, task in handleLog(date: date, task: task) }
-                )
-                
-                ScheduleView(
-                    schedule: schedule,
-                    selectedDate: $selectedDate,
-                    isFreeDay: { isFreeDay(date: $0) },
-                    toggleFreeDay: toggleFreeDay,
-                    onLog: { date in handleLog(date: date) },
-                    logs: logs,
-                    chapters: chapters,
-                    onSelectDay: { dayInfo in
-                        selectedDayInfo = dayInfo
-                    },
-                    plan: currentPlan
-                )
+            if sizeClass == .compact {
+                // iPhone Layout (Vertical Stack)
+                VStack(spacing: 24) {
+                    TodayGoalView(
+                        todayTasks: todayTasks,
+                        chapters: chapters,
+                        isFreeDay: { isFreeDay(date: $0) },
+                        isFinished: isFinished,
+                        hasLoggedToday: { 
+                            let calendar = Calendar.current
+                            return logs.contains { calendar.isDateInToday($0.date) && !$0.isFreeDay }
+                        },
+                        handleLog: { date, task in handleLog(date: date, task: task) }
+                    )
+                    
+                    ScheduleView(
+                        schedule: schedule,
+                        selectedDate: $selectedDate,
+                        isFreeDay: { isFreeDay(date: $0) },
+                        toggleFreeDay: toggleFreeDay,
+                        onLog: { date in handleLog(date: date) },
+                        logs: logs,
+                        chapters: chapters,
+                        onSelectDay: { dayInfo in
+                            selectedDayInfo = dayInfo
+                        },
+                        plan: currentPlan
+                    )
+                }
+                .padding(.vertical)
+            } else {
+                // iPad Layout (Horizontal Split)
+                HStack(alignment: .top, spacing: 32) {
+                    // Left Column: Today's Goal & Insights
+                    VStack(spacing: 24) {
+                        TodayGoalView(
+                            todayTasks: todayTasks,
+                            chapters: chapters,
+                            isFreeDay: { isFreeDay(date: $0) },
+                            isFinished: isFinished,
+                            hasLoggedToday: { 
+                                let calendar = Calendar.current
+                                return logs.contains { calendar.isDateInToday($0.date) && !$0.isFreeDay }
+                            },
+                            handleLog: { date, task in handleLog(date: date, task: task) }
+                        )
+                        
+                        // Future: Add Insights or Stats here
+                        Spacer()
+                    }
+                    .frame(maxWidth: 400) // Fixed width for sidebar-like feel
+                    
+                    // Right Column: Calendar
+                    ScheduleView(
+                        schedule: schedule,
+                        selectedDate: $selectedDate,
+                        isFreeDay: { isFreeDay(date: $0) },
+                        toggleFreeDay: toggleFreeDay,
+                        onLog: { date in handleLog(date: date) },
+                        logs: logs,
+                        chapters: chapters,
+                        onSelectDay: { dayInfo in
+                            selectedDayInfo = dayInfo
+                        },
+                        plan: currentPlan
+                    )
+                }
+                .padding()
             }
-            .padding(.vertical)
         }
     }
     
     var body: some View {
-        NavigationView {
-            mainContentView
-                .navigationTitle("Study Bloom")
-                .toolbar { toolbarContent }
-                .sheet(isPresented: $isShowingSettings) { settingsSheet }
-                .sheet(item: $selectedLogTarget) { target in logSheet(target: target) }
-                .sheet(item: $selectedDayInfo) { dayInfo in
-                    DayDetailView(
-                        dayInfo: dayInfo,
-                        onAddLog: {
-                            // Close detail, open log sheet
-                            selectedDayInfo = nil
-                            
-                            // Delay presentation of new sheet to allow dismissal animation
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                // Create a target. If there is a scheduled task, use it. Otherwise use the chapter from day info or fallback.
-                                if let task = dayInfo.scheduledTask,
-                                   let chapter = chapters.first(where: { $0.id == task.chapterId }) {
-                                    selectedLogTarget = LogTarget(date: dayInfo.date, chapter: chapter)
-                                } else if let chapterTitle = dayInfo.chapterTitle,
-                                          let chapter = chapters.first(where: { $0.title == chapterTitle }) {
-                                    selectedLogTarget = LogTarget(date: dayInfo.date, chapter: chapter)
-                                } else if let firstUnfinished = chapters.first(where: { $0.pagesStudied < $0.totalPages }) {
-                                    selectedLogTarget = LogTarget(date: dayInfo.date, chapter: firstUnfinished)
-                                }
+        mainContentView
+            .navigationTitle("Study Bloom")
+            .toolbar { toolbarContent }
+            .sheet(isPresented: $isShowingSettings) { settingsSheet }
+            .sheet(item: $selectedLogTarget) { target in logSheet(target: target) }
+            .sheet(item: $selectedDayInfo) { dayInfo in
+                DayDetailView(
+                    dayInfo: dayInfo,
+                    onAddLog: {
+                        // Close detail, open log sheet
+                        selectedDayInfo = nil
+                        
+                        // Delay presentation of new sheet to allow dismissal animation
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            // Create a target. If there is a scheduled task, use it. Otherwise use the chapter from day info or fallback.
+                            if let task = dayInfo.scheduledTask,
+                               let chapter = chapters.first(where: { $0.id == task.chapterId }) {
+                                selectedLogTarget = LogTarget(date: dayInfo.date, chapter: chapter)
+                            } else if let chapterTitle = dayInfo.chapterTitle,
+                                      let chapter = chapters.first(where: { $0.title == chapterTitle }) {
+                                selectedLogTarget = LogTarget(date: dayInfo.date, chapter: chapter)
+                            } else if let firstUnfinished = chapters.first(where: { $0.pagesStudied < $0.totalPages }) {
+                                selectedLogTarget = LogTarget(date: dayInfo.date, chapter: firstUnfinished)
                             }
-                        },
-                        onToggleFreeDay: {
-                            toggleFreeDay(dayInfo.date)
-                            selectedDayInfo = nil
-                        },
-                        onDeleteLog: { log in
-                            deleteLog(log)
-                            // We might keep the sheet open and let it refresh?
-                            // But DayInfo is immutable. So simple approach is close it or we need to reload it.
-                            // For MVP, closing it is safest to ensure state refresh.
-                            selectedDayInfo = nil 
                         }
-                    )
-                }
-                .onAppear { recalculateSchedule() }
-                .onChange(of: logs) { _, _ in recalculateSchedule() }
-                .onChange(of: chapters) { _, _ in recalculateSchedule() }
-        }
+                    },
+                    onToggleFreeDay: {
+                        toggleFreeDay(dayInfo.date)
+                        selectedDayInfo = nil
+                    },
+                    onDeleteLog: { log in
+                        deleteLog(log)
+                        // We might keep the sheet open and let it refresh?
+                        // But DayInfo is immutable. So simple approach is close it or we need to reload it.
+                        // For MVP, closing it is safest to ensure state refresh.
+                        selectedDayInfo = nil 
+                    }
+                )
+            }
+            .onAppear { recalculateSchedule() }
+            .onChange(of: logs) { _, _ in recalculateSchedule() }
+            .onChange(of: chapters) { _, _ in recalculateSchedule() }
     }
     
     // Toolbar content - extracted to help compiler

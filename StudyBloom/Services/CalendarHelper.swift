@@ -65,7 +65,19 @@ class CalendarHelper {
         let isPlanFreeDay = plan?.freeDays.contains(calendar.component(.weekday, from: date)) ?? false
         let isFree = isFreeDayLog || isPlanFreeDay
         
+        
         let dailyGoal = plan?.dailyPageGoal ?? 10
+        
+        // Determine effective goal
+        let effectiveGoal = task?.pagesToRead ?? dailyGoal
+        
+        // Check if the chapter worked on is fully completed
+        // This handles the case where goal was 4, but only 2 pages were left and read.
+        var isChapterCompleted = false
+        if let chapterId = dayLogs.first(where: { !$0.isFreeDay })?.chapterId ?? task?.chapterId,
+           let chapter = chapters.first(where: { $0.id == chapterId }) {
+            isChapterCompleted = chapter.pagesStudied >= chapter.totalPages
+        }
         
         var state: DayProgressState = .notScheduled
         
@@ -76,7 +88,8 @@ class CalendarHelper {
             state = task != nil ? .notStarted : .notScheduled
         } else {
             // Past or Today
-            if totalPagesLogged >= dailyGoal {
+            if totalPagesLogged >= effectiveGoal || isChapterCompleted {
+                // If we met the specific task goal OR finished the chapter, it's a win.
                 state = .goalAchieved
             } else if totalPagesLogged > 0 {
                 state = .partialProgress

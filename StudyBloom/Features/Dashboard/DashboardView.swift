@@ -7,47 +7,46 @@ struct DashboardView: View {
     private var chapters: [Chapter] { dataService.chapters }
     
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Welcome / Overview
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("Welcome Back, \(authService.user?.name ?? "Student")!")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                            Text("Here's your study progress.")
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
+        ScrollView {
+            VStack(spacing: 0) {
+                // Welcome / Overview
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text("Welcome Back, \(authService.user?.name ?? "Student")!")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                        Text("Here's your study progress.")
+                            .foregroundStyle(.secondary)
                     }
-                    .padding(.horizontal)
+                    Spacer()
+                }
+                .padding(.horizontal)
+                
+                // Chapter Summaries
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Your Chapters")
+                        .font(.headline)
+                        .padding(.horizontal)
                     
-                    // Chapter Summaries
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Your Chapters")
-                            .font(.headline)
-                            .padding(.horizontal)
-                        
-                        if chapters.isEmpty {
-                            Text("No chapters added yet.")
-                                .foregroundStyle(.secondary)
-                                .padding()
-                        } else {
-                            LazyVStack(spacing: 16) {
-                                ForEach(chapters) { chapter in
-                                    ChapterSummaryCard(chapter: chapter)
-                                }
+                    if chapters.isEmpty {
+                        Text("No chapters added yet.")
+                            .foregroundStyle(.secondary)
+                            .padding()
+                    } else {
+                        LazyVStack(spacing: 16) {
+                            ForEach(chapters) { chapter in
+                                ChapterSummaryCard(chapter: chapter)
                             }
-                            .padding(.horizontal)
                         }
+                        .padding(.horizontal)
                     }
                 }
-                .padding(.vertical)
             }
-            .navigationTitle("Dashboard")
+            .padding(.vertical)
         }
+        .navigationTitle("Dashboard")
     }
+    
 }
 
 struct ChapterSummaryCard: View {
