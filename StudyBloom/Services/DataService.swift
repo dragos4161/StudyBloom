@@ -302,6 +302,18 @@ class DataService: ObservableObject {
             DispatchQueue.main.async {
                 NotificationManager.shared.userDidStudy(pages: newLog.pagesLearned)
             }
+            
+            // Log to Analytics (if not a free day)
+            if !newLog.isFreeDay && newLog.pagesLearned > 0 {
+                Task {
+                    // Estimate study time (2 min per page average)
+                    let estimatedTime = Double(newLog.pagesLearned) * 120
+                    try? await AnalyticsService.shared.logStudySession(
+                        pages: newLog.pagesLearned,
+                        duration: estimatedTime
+                    )
+                }
+            }
         } catch {
             print("❌ Error adding daily log: \(error.localizedDescription)")
             throw error
