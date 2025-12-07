@@ -72,14 +72,24 @@ class FirebaseService: ObservableObject {
             
             if document.exists {
                 // User exists - update name, email, and timestamp
-                try await userRef.updateData([
+                var updateData: [String: Any] = [
                     "name": user.name,
                     "username": user.username as Any,
                     "email": user.email,
                     "educationLevel": user.educationLevel as Any,
                     "learningFocus": user.learningFocus as Any,
                     "updatedAt": Timestamp(date: Date())
-                ])
+                ]
+                
+                // Preserve stats if they exist in the model
+                if let studyStreak = user.studyStreak {
+                    updateData["studyStreak"] = studyStreak
+                }
+                if let totalStudyTime = user.totalStudyTime {
+                    updateData["totalStudyTime"] = totalStudyTime
+                }
+                
+                try await userRef.updateData(updateData)
                 print("✅ Updated existing user: \(userId)")
             } else {
                 // New user - create with all data including timestamps

@@ -21,11 +21,16 @@ class AnalyticsService: ObservableObject {
         let doc = try await db.collection("statistics").document(userId).getDocument()
         
         if let stats = try? doc.data(as: StudyStatistics.self) {
+            // Self-healing: Sync to profile to ensure friends see up-to-date stats
+            // This fixes the issue where existing stats weren't reflected in the public profile
+            syncToUserProfile(userId: userId, stats: stats)
             return stats
         } else {
             // Create new statistics
             let newStats = StudyStatistics(userId:userId)
             try db.collection("statistics").document(userId).setData(from: newStats)
+            // Sync new stats too
+            syncToUserProfile(userId: userId, stats: newStats)
             return newStats
         }
     }
@@ -57,10 +62,50 @@ class AnalyticsService: ObservableObject {
         stats.lastUpdated = Date()
         
         // Save to Firebase
+        // Save to Firebase
         try db.collection("statistics").document(userId).setData(from: stats)
+        
+        // Sync to public profile
+        syncToUserProfile(userId: userId, stats: stats)
+    }
+    
+    // Combined method to avoid race conditions when finishing a timer
+    func logPomodoroCompletion(duration: TimeInterval) async throws {
+        guard let userId = Auth.auth().currentUser?.uid else { return }
+        
+        var stats = try await fetchStatistics()
+        
+        // Update Time
+        stats.totalStudyTime += duration
+        
+        // Update Pomodoro Count
+        stats.pomodoroSessionsCompleted += 1
+        
+        // Update Daily Stats for both
+        let today = Calendar.current.startOfDay(for: Date())
+        if let index = stats.dailyStats.firstIndex(where: { Calendar.current.isDate($0.date, inSameDayAs: today) }) {
+            stats.dailyStats[index].studyTime += duration
+            stats.dailyStats[index].pomodoroSessions += 1
+        } else {
+            // New daily entry
+            var newDailyStat = DailyStat(date: today, pagesStudied: 0, studyTime: duration)
+            newDailyStat.pomodoroSessions = 1
+            stats.dailyStats.append(newDailyStat)
+        }
+        
+        // Update Streak (based on study activity)
+        updateStreak(stats: &stats)
+        
+        stats.lastUpdated = Date()
+        try db.collection("statistics").document(userId).setData(from: stats)
+        
+        // Sync to public profile
+        syncToUserProfile(userId: userId, stats: stats)
     }
     
     func logPomodoroSession() async throws {
+        // Keeps existing implementation for manual logging if needed,
+        // but logPomodoroCompletion is preferred for timer finishes.
         guard let userId = Auth.auth().currentUser?.uid else { return }
         
         var stats = try await fetchStatistics()
@@ -77,6 +122,9 @@ class AnalyticsService: ObservableObject {
         
         stats.lastUpdated = Date()
         try db.collection("statistics").document(userId).setData(from: stats)
+        
+        // Sync to public profile
+        syncToUserProfile(userId: userId, stats: stats)
     }
     
     func logFlashcardReview(count: Int) async throws {
@@ -96,6 +144,9 @@ class AnalyticsService: ObservableObject {
         
         stats.lastUpdated = Date()
         try db.collection("statistics").document(userId).setData(from: stats)
+        
+        // Sync to public profile
+        syncToUserProfile(userId: userId, stats: stats)
     }
     
     // MARK: - Streak Calculation
@@ -188,5 +239,24 @@ class AnalyticsService: ObservableObject {
         let daysWithStudy = stats.dailyStats.filter { $0.studyTime > 0 }.count
         
         return daysWithStudy > 0 ? totalTime / Double(daysWithStudy) : 0
+    }
+    
+    // MARK: - Profile Sync
+    
+    /// Syncs key statistics to the public user profile so friends can see them
+    private func syncToUserProfile(userId: String, stats: StudyStatistics) {
+        let profileData: [String: Any] = [
+            "studyStreak": stats.currentStreak,
+            "totalStudyTime": stats.totalStudyTime,
+            "updatedAt": Timestamp(date: Date())
+        ]
+        
+        // Fire and forget update
+        // Use setData with merge: true to avoid errors if document missing and for robustness
+        db.collection("users").document(userId).setData(profileData, merge: true) { error in
+            if let error = error {
+                print("Error syncing stats to user profile: \(error)")
+            }
+        }
     }
 }

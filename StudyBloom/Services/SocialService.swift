@@ -178,6 +178,26 @@ class SocialService: ObservableObject {
         return profile
     }
     
+    func fetchUserStatistics(userId: String) async throws -> StudyStatistics {
+        let doc = try await db.collection("statistics").document(userId).getDocument()
+        guard let stats = try? doc.data(as: StudyStatistics.self) else {
+            throw NSError(domain: "SocialService", code: 404, userInfo: [NSLocalizedDescriptionKey: "Statistics not found"])
+        }
+        return stats
+    }
+    
+    func backfillUserStats(userId: String, stats: StudyStatistics) async {
+        let updateData: [String: Any] = [
+            "studyStreak": stats.currentStreak,
+            "totalStudyTime": stats.totalStudyTime,
+            "updatedAt": Timestamp(date: Date())
+        ]
+        
+        // Fire and forget, but using await to ensure it's sent
+        // Use setData merge: true for safety although document should exist
+        try? await db.collection("users").document(userId).setData(updateData, merge: true)
+    }
+    
     // MARK: - Friendship Status
     
     enum FriendStatus {

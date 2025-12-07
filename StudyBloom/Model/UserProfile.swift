@@ -2,7 +2,7 @@ import Foundation
 import FirebaseFirestore
 
 struct UserProfile: Codable, Identifiable {
-    @DocumentID var id: String?
+    var id: String?
     var displayName: String
     var username: String // Unique, searchable (e.g., @johndoe)
     var profileImageUrl: String?

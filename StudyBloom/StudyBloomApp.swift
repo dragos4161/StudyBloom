@@ -23,8 +23,7 @@ struct StudyBloomApp: App {
         // This ensures tracking only works in the main app, avoiding Widget compile errors
         TimerService.shared.onSessionCompleted = { duration in
             Task {
-                try? await AnalyticsService.shared.logStudySession(pages: 0, duration: duration)
-                try? await AnalyticsService.shared.logPomodoroSession()
+                try? await AnalyticsService.shared.logPomodoroCompletion(duration: duration)
             }
         }
     }

@@ -45,6 +45,22 @@ class AuthService: NSObject, ObservableObject {
                             user = updatedUser
                         }
                         
+                        // Self-Repair: Check if stats are missing and backfill if necessary
+                        if user?.studyStreak == nil || user?.totalStudyTime == nil {
+                             // Fetch stats from statistics collection
+                             if let stats = try? await SocialService.shared.fetchUserStatistics(userId: firebaseUser.uid) {
+                                 print("🔧 Self-Repairing user stats...")
+                                 // Update user model
+                                 user?.studyStreak = stats.currentStreak
+                                 user?.totalStudyTime = stats.totalStudyTime
+                                 
+                                 // Update Firestore immediately
+                                 if var validUser = user {
+                                     try await self.firebaseService.createOrUpdateUser(validUser)
+                                 }
+                             }
+                        }
+
                         await MainActor.run {
                             self.user = user
                             self.isAuthenticated = true

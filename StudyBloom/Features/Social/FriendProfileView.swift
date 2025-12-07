@@ -1,7 +1,8 @@
 import SwiftUI
 
 struct FriendProfileView: View {
-    let profile: UserProfile
+    let initialProfile: UserProfile
+    @State private var displayedProfile: UserProfile
     @Environment(\.dismiss) var dismiss
     @StateObject private var socialService = SocialService.shared
     @State private var sharedDecks: [SharedDeck] = []
@@ -9,6 +10,11 @@ struct FriendProfileView: View {
     @State private var showingRemoveAlert = false
     @State private var friendStatus: SocialService.FriendStatus = .notFriends
     @State private var isProcessing = false
+    
+    init(profile: UserProfile) {
+        self.initialProfile = profile
+        self._displayedProfile = State(initialValue: profile)
+    }
     
     var body: some View {
         NavigationView {
@@ -20,24 +26,24 @@ struct FriendProfileView: View {
                             .fill(LinearGradient(colors: [.blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing))
                             .frame(width: 100, height: 100)
                             .overlay {
-                                Text(profile.displayName.prefix(1))
+                                Text(displayedProfile.displayName.prefix(1))
                                     .font(.system(size: 40))
                                     .fontWeight(.bold)
                                     .foregroundStyle(.white)
                             }
                         
-                        Text(profile.displayName)
+                        Text(displayedProfile.displayName)
                             .font(.title)
                             .fontWeight(.bold)
                         
-                        Text("@\(profile.username)")
+                        Text("@\(displayedProfile.username)")
                             .font(.title3)
                             .foregroundStyle(.secondary)
                     }
                     .padding(.top)
                     
                     // Study Stats (if visible)
-                    if profile.privacySettings.statsVisibility != .private {
+                    if displayedProfile.privacySettings.statsVisibility != .private {
                         statsCardView
                     }
                     
@@ -136,12 +142,12 @@ struct FriendProfileView: View {
                 Button("Cancel", role: .cancel) {}
                 Button("Remove", role: .destructive) {
                     Task {
-                        try? await socialService.removeFriend(profile.id ?? "")
+                        try? await socialService.removeFriend(displayedProfile.id ?? "")
                         dismiss()
                     }
                 }
             } message: {
-                Text("Are you sure you want to remove \(profile.displayName) from your friends?")
+                Text("Are you sure you want to remove \(displayedProfile.displayName) from your friends?")
             }
         }
     }
@@ -157,7 +163,7 @@ struct FriendProfileView: View {
             HStack(spacing: 20) {
                 StatItemView(
                     icon: "flame.fill",
-                    value: "\(profile.studyStreak)",
+                    value: "\(displayedProfile.studyStreak)",
                     label: "Day Streak",
                     color: .orange
                 )
@@ -167,7 +173,7 @@ struct FriendProfileView: View {
                 
                 StatItemView(
                     icon: "clock.fill",
-                    value: formatTime(profile.totalStudyTime),
+                    value: formatTime(displayedProfile.totalStudyTime),
                     label: "Total Time",
                     color: .blue
                 )
@@ -217,9 +223,28 @@ struct FriendProfileView: View {
     private func loadData() async {
         isLoadingDecks = true
         
-        // Check friendship status first
-        if let userId = profile.id {
+        // Refresh Profile Data
+        if let userId = displayedProfile.id {
             do {
+                // Fetch fresh profile data
+                var freshProfile = try await socialService.fetchUserProfile(userId: userId)
+                
+                // Fallback: If stats are 0, try to fetch from statistics collection directly
+                // This handles cases where the public profile is stale (friend hasn't opened app)
+                if freshProfile.studyStreak == 0 && freshProfile.totalStudyTime == 0 {
+                    if let stats = try? await socialService.fetchUserStatistics(userId: userId) {
+                        freshProfile.studyStreak = stats.currentStreak
+                        freshProfile.totalStudyTime = stats.totalStudyTime
+                        
+                        // Lazy Backfill: Update the stale users document so next time it's correct
+                        await socialService.backfillUserStats(userId: userId, stats: stats)
+                    }
+                }
+                
+                await MainActor.run {
+                    self.displayedProfile = freshProfile
+                }
+                
                 let status = try await socialService.checkFriendshipStatus(with: userId)
                 await MainActor.run {
                     self.friendStatus = status
@@ -246,15 +271,15 @@ struct FriendProfileView: View {
     }
     
     private func sendFriendRequest() {
-        guard let userId = profile.id else { return }
+        guard let userId = displayedProfile.id else { return }
         isProcessing = true
         
         Task {
             do {
                 try await socialService.sendFriendRequest(
                     to: userId,
-                    recipientName: profile.displayName,
-                    recipientUsername: profile.username
+                    recipientName: displayedProfile.displayName,
+                    recipientUsername: displayedProfile.username
                 )
                 await MainActor.run {
                     friendStatus = .requestSent
@@ -274,7 +299,7 @@ struct FriendProfileView: View {
         // Or fetch pending requests and find match.
         Task {
             // Find request ID
-            if let request = socialService.pendingRequests.first(where: { $0.senderId == profile.id }) {
+            if let request = socialService.pendingRequests.first(where: { $0.senderId == displayedProfile.id }) {
                 try? await socialService.acceptFriendRequest(request.id ?? "")
                 await loadData()
             }
@@ -283,7 +308,7 @@ struct FriendProfileView: View {
     
     private func declineRequest() {
         Task {
-            if let request = socialService.pendingRequests.first(where: { $0.senderId == profile.id }) {
+            if let request = socialService.pendingRequests.first(where: { $0.senderId == displayedProfile.id }) {
                 try? await socialService.declineFriendRequest(request.id ?? "")
                 await loadData()
             }
