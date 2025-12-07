@@ -35,47 +35,86 @@ struct HomeView: View {
         Group {
             if sizeClass == .compact {
                 // iPhone Layout
-                TabView(selection: $tabSelection) {
-                    NavigationStack {
-                        StudyDashboardView()
+                if #available(iOS 18.0, *) {
+                    TabView(selection: $tabSelection) {
+                        Tab("Study", systemImage: "book.fill", value: .study) {
+                            NavigationStack {
+                                StudyDashboardView()
+                            }
+                        }
+                        
+                        Tab("Chapters", systemImage: "list.bullet", value: .chapters) {
+                            NavigationStack {
+                                ChapterListView()
+                            }
+                        }
+                        
+                        Tab("Flashcards", systemImage: "rectangle.on.rectangle.angled", value: .flashcards) {
+                            NavigationStack {
+                                FlashcardDeckView()
+                            }
+                        }
+                        
+                        Tab("Social", systemImage: "person.2.fill", value: .social) {
+                            NavigationStack {
+                                SocialView()
+                            }
+                            // Badge logic for iOS 18?
+                            // .badge() modifier works on Tab content usually.
+                        }
+                        .badge(badgeManager.friendRequestCount)
+                        
+                        Tab("More", systemImage: "square.grid.2x2.fill", value: .more, role: .search) {
+                             // This view is what shows when you tap the button?
+                             // Or does .search role imply it's just a button?
+                             // Typically role: .search presents a search interface.
+                             MoreView()
+                        }
                     }
-                    .tabItem { Label("Study", systemImage: "book.fill") }
-                    .tag(NavigationItem.study)
-                    
-                    NavigationStack {
-                        ChapterListView()
+                } else {
+                    // Legacy iOS < 18 Layout
+                    TabView(selection: $tabSelection) {
+                        NavigationStack {
+                            StudyDashboardView()
+                        }
+                        .tabItem { Label("Study", systemImage: "book.fill") }
+                        .tag(NavigationItem.study)
+                        
+                        NavigationStack {
+                            ChapterListView()
+                        }
+                        .tabItem { Label("Chapters", systemImage: "list.bullet") }
+                        .tag(NavigationItem.chapters)
+                        
+                        NavigationStack {
+                            FlashcardDeckView()
+                        }
+                        .tabItem { Label("Flashcards", systemImage: "rectangle.on.rectangle.angled") }
+                        .tag(NavigationItem.flashcards)
+                        
+                        NavigationStack {
+                            SocialView()
+                        }
+                        .tabItem { Label("Social", systemImage: "person.2.fill") }
+                        .tag(NavigationItem.social)
+                        .badge(badgeManager.friendRequestCount)
+                        
+                        // "More" Tab - dummy view, intercepted by onChange
+                        Color.clear
+                            .tabItem { Label("More", systemImage: "square.grid.2x2.fill") }
+                            .tag(NavigationItem.more)
                     }
-                    .tabItem { Label("Chapters", systemImage: "list.bullet") }
-                    .tag(NavigationItem.chapters)
-                    
-                    NavigationStack {
-                        FlashcardDeckView()
-                    }
-                    .tabItem { Label("Flashcards", systemImage: "rectangle.on.rectangle.angled") }
-                    .tag(NavigationItem.flashcards)
-                    
-                    NavigationStack {
-                        SocialView()
-                    }
-                    .tabItem { Label("Social", systemImage: "person.2.fill") }
-                    .tag(NavigationItem.social)
-                    .badge(badgeManager.friendRequestCount)
-                    
-                    // "More" Tab - dummy view, intercepted by onChange
-                    Color.clear
-                        .tabItem { Label("More", systemImage: "square.grid.2x2.fill") }
-                        .tag(NavigationItem.more)
-                }
-                .onChange(of: tabSelection) { newValue in
-                    if newValue == .more {
-                        isShowingMoreSheet = true
-                        tabSelection = lastSelection
-                    } else {
-                        lastSelection = newValue
+                    .onChange(of: tabSelection) { newValue in
+                        if newValue == .more {
+                            isShowingMoreSheet = true
+                            tabSelection = lastSelection
+                        } else {
+                            lastSelection = newValue
+                        }
                     }
                 }
             } else {
-                // iPad Layout
+                // iPad Layout (unchanged)
                 NavigationSplitView {
                     List(NavigationItem.allCases, selection: $selection) { item in
                         Label(item.rawValue, systemImage: item.icon)
