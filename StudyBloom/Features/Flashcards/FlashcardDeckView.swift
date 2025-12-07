@@ -8,6 +8,7 @@ struct DeckWrapper: Identifiable {
 struct FlashcardDeckView: View {
     @EnvironmentObject var dataService: DataService
     @State private var showingCreateSheet = false
+    @State private var deckToShare: ShareableDeck?
     @State private var selectedDeck: DeckWrapper?
     
     @Environment(\.horizontalSizeClass) var sizeClass
@@ -44,6 +45,9 @@ struct FlashcardDeckView: View {
         .sheet(isPresented: $showingCreateSheet) {
             CreateFlashcardView()
         }
+        .sheet(item: $deckToShare) { deck in
+            ShareDeckView(flashcards: deck.cards, initialTitle: deck.title)
+        }
         .fullScreenCover(item: $selectedDeck) { deckWrapper in
             NavigationView {
                 FlashcardSessionView(deck: deckWrapper.cards)
@@ -62,11 +66,27 @@ struct FlashcardDeckView: View {
                         selectedDeck = DeckWrapper(cards: dataService.flashcards)
                     }
                 }
+                .contextMenu {
+                    Button {
+                        if !dataService.flashcards.isEmpty {
+                            deckToShare = ShareableDeck(title: "All Flashcards", cards: dataService.flashcards)
+                        }
+                    } label: {
+                        Label("Share Deck", systemImage: "square.and.arrow.up")
+                    }
+                }
                 
                 let dueCards = dataService.flashcards.filter { $0.isDue }
                 if !dueCards.isEmpty {
                     deckItem(title: "Due for Review", count: dueCards.count, color: .orange) {
                         selectedDeck = DeckWrapper(cards: dueCards)
+                    }
+                    .contextMenu {
+                        Button {
+                            deckToShare = ShareableDeck(title: "Due for Review", cards: dueCards)
+                        } label: {
+                            Label("Share Deck", systemImage: "square.and.arrow.up")
+                        }
                     }
                 }
             }
@@ -80,6 +100,13 @@ struct FlashcardDeckView: View {
                     if !chapterCards.isEmpty {
                         deckItem(title: chapter.title, count: chapterCards.count, color: Color(hex: chapter.colorHex) ?? .purple) {
                             selectedDeck = DeckWrapper(cards: chapterCards)
+                        }
+                        .contextMenu {
+                            Button {
+                                deckToShare = ShareableDeck(title: chapter.title, cards: chapterCards)
+                            } label: {
+                                Label("Share Deck", systemImage: "square.and.arrow.up")
+                            }
                         }
                     }
                 }
@@ -115,6 +142,12 @@ struct FlashcardDeckView: View {
             DeckCard(title: title, count: count, color: color, action: action)
         }
     }
+}
+
+struct ShareableDeck: Identifiable {
+    let id = UUID()
+    let title: String
+    let cards: [Flashcard]
 }
 
 struct DeckRow: View {

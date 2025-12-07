@@ -226,11 +226,13 @@ struct FriendProfileView: View {
                 }
                 
                 // Only load shared decks if friends or public visibility logic allows (SocialService handles fetching, we filter later)
-                // But for now, let's load decks regardless and filter by what SocialService returns
+                // We use canAccess method to handle all visibility cases (Public, Friends, Specific)
                 let decks = try await socialService.fetchSharedDecks(from: userId)
+                
                 await MainActor.run {
+                    let currentUserId = socialService.currentUserId ?? ""
                     self.sharedDecks = decks.filter { deck in
-                        deck.visibility == .public || (deck.visibility == .friends && status == .friend)
+                        deck.canAccess(userId: currentUserId, isFriend: status == .friend)
                     }
                     isLoadingDecks = false
                 }
@@ -329,6 +331,7 @@ struct StatItemView: View {
 
 struct SharedDeckCardView: View {
     let deck: SharedDeck
+    @EnvironmentObject var dataService: DataService
     @State private var showingImportSheet = false
     @State private var isImporting = false
     
@@ -374,6 +377,7 @@ struct SharedDeckCardView: View {
                         .font(.subheadline)
                         .fontWeight(.medium)
                 }
+                .disabled(isImporting)
                 .buttonStyle(.bordered)
             }
         }
@@ -397,6 +401,7 @@ struct SharedDeckCardView: View {
         switch visibility {
         case .public: return "globe"
         case .friends: return "person.2"
+        case .specific: return "person.fill.checkmark"
         case .private: return "lock"
         }
     }
@@ -408,8 +413,8 @@ struct SharedDeckCardView: View {
             guard let deckId = deck.id else { return }
             let flashcards = try await SocialService.shared.importSharedDeck(deckId)
             
-            // TODO: Save flashcards to user's collection via DataService
-            print("Imported \(flashcards.count) flashcards")
+            // Save to DataService
+            try await dataService.importSharedDeck(title: deck.title, flashcards: flashcards)
             
             await MainActor.run {
                 isImporting = false

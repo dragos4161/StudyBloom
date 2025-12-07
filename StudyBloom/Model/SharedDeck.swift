@@ -63,7 +63,13 @@ struct SharedDeck: Codable, Identifiable {
             return true
         }
         
-        // Explicitly shared with user
+        // Explicitly shared with user (Specific)
+        if visibility == .specific && sharedWith.contains(userId) {
+            return true
+        }
+        
+        // Legacy/Fallback: checking sharedWith regardless of visibility type, 
+        // though typically specific usage implies the .specific type.
         if sharedWith.contains(userId) {
             return true
         }
@@ -72,8 +78,9 @@ struct SharedDeck: Codable, Identifiable {
     }
 }
 
-enum DeckVisibility: String, Codable {
+enum DeckVisibility: String, Codable, CaseIterable {
     case `private`
     case friends
     case `public`
+    case specific
 }

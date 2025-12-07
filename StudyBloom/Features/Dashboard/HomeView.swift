@@ -65,10 +65,9 @@ struct HomeView: View {
                         .badge(badgeManager.friendRequestCount)
                         
                         Tab("More", systemImage: "square.grid.2x2.fill", value: .more, role: .search) {
-                             // This view is what shows when you tap the button?
-                             // Or does .search role imply it's just a button?
-                             // Typically role: .search presents a search interface.
-                             MoreView()
+                             NavigationStack {
+                                 MoreView()
+                             }
                         }
                     }
                 } else {
@@ -157,7 +156,7 @@ struct MoreView: View {
                 NavigationLink {
                     DashboardView()
                 } label: {
-                    Label("Home", systemImage: "house.fill")
+                    Label("Dashboard", systemImage: "gauge")
                         .foregroundColor(.primary)
                 }
                 

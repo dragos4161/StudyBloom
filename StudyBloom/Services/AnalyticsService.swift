@@ -1,6 +1,7 @@
 import Foundation
 import FirebaseFirestore
 import FirebaseAuth
+import Combine
 
 class AnalyticsService: ObservableObject {
     static let shared = AnalyticsService()

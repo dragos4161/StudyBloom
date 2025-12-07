@@ -13,6 +13,10 @@ class SocialService: ObservableObject {
     private var requestsListener: ListenerRegistration?
     private var friendsListener: ListenerRegistration?
     
+    var currentUserId: String? {
+        Auth.auth().currentUser?.uid
+    }
+    
     private init() {}
     
     // MARK: - Friend Requests
@@ -146,6 +150,11 @@ class SocialService: ObservableObject {
         
         for doc in friendships {
             try await doc.reference.delete()
+        }
+        
+        // Optimistic update
+        await MainActor.run {
+            self.friends.removeAll { $0.id == userId }
         }
     }
     

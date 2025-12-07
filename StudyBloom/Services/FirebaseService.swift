@@ -45,7 +45,7 @@ class FirebaseService: ObservableObject {
             }
             }
         }
-    }
+    
     
     func fetchUser(userId: String) async throws -> User? {
         let document = try await db.collection("users").document(userId).getDocument()

@@ -449,4 +449,52 @@ class DataService: ObservableObject {
             throw error
         }
     }
+    
+    // MARK: - Deck Import
+    
+    func importSharedDeck(title: String, flashcards: [Flashcard]) async throws {
+        guard let userId = currentUserId else {
+            throw NSError(domain: "DataService", code: -1, userInfo: [NSLocalizedDescriptionKey: "No user logged in"])
+        }
+        
+        // 1. Create a new Chapter for this deck
+        let newChapterId = UUID().uuidString
+        let newChapter = Chapter(
+            id: newChapterId,
+            userId: userId,
+            title: title,
+            totalPages: 0, // Imported decks don't track pages initially
+            orderIndex: chapters.count,
+            colorHex: "#5856D6" // Purple/Indigo
+        )
+        
+        try await addChapter(newChapter)
+        
+        // 2. Add all flashcards, linked to this chapter
+        let batch = db.batch()
+        let flashcardsRef = db.collection("users").document(userId).collection("flashcards")
+        
+        for var card in flashcards {
+            // Generate new ID for the imported card to avoid collisions if imported multiple times
+            // or if we ever sync back (though here we treat as copy)
+            let newCardId = UUID().uuidString
+            card = Flashcard(
+                id: newCardId,
+                userId: userId,
+                front: card.front,
+                back: card.back,
+                chapterId: newChapterId,
+                interval: 0,
+                repetition: 0,
+                easeFactor: 2.5,
+                nextReviewDate: Date()
+            )
+            
+            let docRef = flashcardsRef.document(newCardId)
+            try batch.setData(from: card, forDocument: docRef)
+        }
+        
+        try await batch.commit()
+        print("✅ Imported deck '\(title)' with \(flashcards.count) cards")
+    }
 }
