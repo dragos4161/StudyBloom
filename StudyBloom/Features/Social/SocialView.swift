@@ -10,6 +10,7 @@ struct SocialView: View {
     @State private var searchResults: [UserProfile] = []
     @State private var isSearching = false
     @State private var selectedProfile: UserProfile?
+    @State private var isLoading = false
     
     enum SocialTab: String, CaseIterable {
         case friends = "Friends"
@@ -18,40 +19,38 @@ struct SocialView: View {
     }
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Segmented Control
-                Picker("Tab", selection: $selectedTab) {
-                    ForEach(SocialTab.allCases, id: \.self) { tab in
-                        if tab == .requests && badgeManager.friendRequestCount > 0 {
-                            Text("\(tab.rawValue) (\(badgeManager.friendRequestCount))").tag(tab)
-                        } else {
-                            Text(tab.rawValue).tag(tab)
-                        }
+        VStack(spacing: 0) {
+            // Segmented Control
+            Picker("Tab", selection: $selectedTab) {
+                ForEach(SocialTab.allCases, id: \.self) { tab in
+                    if tab == .requests && badgeManager.friendRequestCount > 0 {
+                        Text("\(tab.rawValue) (\(badgeManager.friendRequestCount))").tag(tab)
+                    } else {
+                        Text(tab.rawValue).tag(tab)
                     }
                 }
-                .pickerStyle(.segmented)
-                .padding()
-                
-                // Content
-                switch selectedTab {
-                case .friends:
-                    friendsListView
-                case .requests:
-                    requestsListView
-                case .discover:
-                    discoverView
-                }
             }
-            .navigationTitle("Social")
-            .onAppear {
-                Task {
-                    try? await loadData()
-                }
+            .pickerStyle(.segmented)
+            .padding()
+            
+            // Content
+            switch selectedTab {
+            case .friends:
+                friendsListView
+            case .requests:
+                requestsListView
+            case .discover:
+                discoverView
             }
+        }
+        .navigationTitle("Social")
+        .onAppear {
+            Task {
+                try? await loadData()
+            }
+        }
         .sheet(item: $selectedProfile) { profile in
             FriendProfileView(profile: profile)
-        }
         }
     }
     
@@ -59,7 +58,10 @@ struct SocialView: View {
     
     private var friendsListView: some View {
         Group {
-            if socialService.friends.isEmpty {
+            if isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if socialService.friends.isEmpty {
                 emptyFriendsView
             } else {
                 List(socialService.friends) { friend in
@@ -97,7 +99,10 @@ struct SocialView: View {
     
     private var requestsListView: some View {
         Group {
-            if socialService.pendingRequests.isEmpty {
+            if isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if socialService.pendingRequests.isEmpty {
                 emptyRequestsView
             } else {
                 List(socialService.pendingRequests) { request in
@@ -225,6 +230,7 @@ struct SocialView: View {
     // MARK: - Helper Methods
     
     private func loadData() async {
+        await MainActor.run { isLoading = true }
         do {
             let friends = try await socialService.fetchFriends()
             let requests = try await socialService.fetchPendingRequests()
@@ -232,9 +238,11 @@ struct SocialView: View {
             await MainActor.run {
                 socialService.friends = friends
                 socialService.pendingRequests = requests
+                isLoading = false
             }
         } catch {
             print("Error loading social data: \(error)")
+            await MainActor.run { isLoading = false }
         }
     }
     

@@ -14,41 +14,39 @@ struct AnalyticsView: View {
     }
     
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
-                    if isLoading {
-                        ProgressView()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else if let stats = statistics {
-                        // Streak Card
-                        streakCard(stats: stats)
-                        
-                        // Quick Stats
-                        quickStatsGrid(stats: stats)
-                        
-                        // Period Selector
-                        periodSelector
-                        
-                        // Weekly Trends Chart
-                        weeklyTrendsCard(stats: stats)
-                        
-                        // Study Heatmap
-                        StudyHeatmapView(statistics: stats)
-                            .padding(.horizontal)
-                    } else {
-                        emptyStateView
-                    }
+        ScrollView {
+            VStack(spacing: 24) {
+                if isLoading {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let stats = statistics {
+                    // Streak Card
+                    streakCard(stats: stats)
+                    
+                    // Quick Stats
+                    quickStatsGrid(stats: stats)
+                    
+                    // Period Selector
+                    periodSelector
+                    
+                    // Weekly Trends Chart
+                    weeklyTrendsCard(stats: stats)
+                    
+                    // Study Heatmap
+                    StudyHeatmapView(statistics: stats)
+                        .padding(.horizontal)
+                } else {
+                    emptyStateView
                 }
-                .padding(.vertical)
             }
-            .navigationTitle("Analytics")
-            .task {
-                await loadStatistics()
-            }
-            .refreshable {
-                await loadStatistics()
-            }
+            .padding(.vertical)
+        }
+        .navigationTitle("Analytics")
+        .task {
+            await loadStatistics()
+        }
+        .refreshable {
+            await loadStatistics()
         }
     }
     

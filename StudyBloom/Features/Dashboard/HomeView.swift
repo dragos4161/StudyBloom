@@ -123,12 +123,14 @@ struct HomeView: View {
                 } detail: {
                     // Determine view based on selection
                     // Default to Study if selection is nil
-                    switch selection ?? .study {
-                    case .study: StudyDashboardView()
-                    case .chapters: ChapterListView()
-                    case .flashcards: FlashcardDeckView()
-                    case .social: SocialView()
-                    case .more: MoreView()
+                    NavigationStack {
+                        switch selection ?? .study {
+                        case .study: StudyDashboardView()
+                        case .chapters: ChapterListView()
+                        case .flashcards: FlashcardDeckView()
+                        case .social: SocialView()
+                        case .more: MoreView()
+                        }
                     }
                 }
             }
