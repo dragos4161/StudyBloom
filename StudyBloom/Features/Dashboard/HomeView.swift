@@ -2,35 +2,34 @@ import SwiftUI
 
 struct HomeView: View {
     @Environment(\.horizontalSizeClass) var sizeClass
-    @State private var selection: NavigationItem? = .home
+    @State private var selection: NavigationItem? = .study
     @EnvironmentObject var badgeManager: BadgeManager
     
     // For TabView binding (requires non-optional)
-    @State private var tabSelection: NavigationItem = .home
+    @State private var tabSelection: NavigationItem = .study
+    @State private var isShowingMoreSheet = false
     
     enum NavigationItem: String, CaseIterable, Identifiable {
-        case home = "Home"
         case study = "Study"
-        case flashcards = "Flashcards"
         case chapters = "Chapters"
+        case flashcards = "Flashcards"
         case social = "Social"
-        case analytics = "Analytics"
-        case profile = "Profile"
+        case more = "More"
         
         var id: String { self.rawValue }
         
         var icon: String {
             switch self {
-            case .home: return "house.fill"
             case .study: return "book.fill"
-            case .flashcards: return "rectangle.on.rectangle.angled"
             case .chapters: return "list.bullet"
+            case .flashcards: return "rectangle.on.rectangle.angled"
             case .social: return "person.2.fill"
-            case .analytics: return "chart.bar.fill"
-            case .profile: return "person"
+            case .more: return "square.grid.2x2.fill"
             }
         }
     }
+    
+    @State private var lastSelection: NavigationItem = .study
     
     var body: some View {
         Group {
@@ -38,16 +37,16 @@ struct HomeView: View {
                 // iPhone Layout
                 TabView(selection: $tabSelection) {
                     NavigationStack {
-                        DashboardView()
-                    }
-                    .tabItem { Label("Home", systemImage: "house.fill") }
-                    .tag(NavigationItem.home)
-                    
-                    NavigationStack {
                         StudyDashboardView()
                     }
                     .tabItem { Label("Study", systemImage: "book.fill") }
                     .tag(NavigationItem.study)
+                    
+                    NavigationStack {
+                        ChapterListView()
+                    }
+                    .tabItem { Label("Chapters", systemImage: "list.bullet") }
+                    .tag(NavigationItem.chapters)
                     
                     NavigationStack {
                         FlashcardDeckView()
@@ -62,23 +61,18 @@ struct HomeView: View {
                     .tag(NavigationItem.social)
                     .badge(badgeManager.friendRequestCount)
                     
-                    NavigationStack {
-                        ChapterListView()
+                    // "More" Tab - dummy view, intercepted by onChange
+                    Color.clear
+                        .tabItem { Label("More", systemImage: "square.grid.2x2.fill") }
+                        .tag(NavigationItem.more)
+                }
+                .onChange(of: tabSelection) { newValue in
+                    if newValue == .more {
+                        isShowingMoreSheet = true
+                        tabSelection = lastSelection
+                    } else {
+                        lastSelection = newValue
                     }
-                    .tabItem { Label("Chapters", systemImage: "list.bullet") }
-                    .tag(NavigationItem.chapters)
-                    
-                    NavigationStack {
-                        AnalyticsView()
-                    }
-                    .tabItem { Label("Analytics", systemImage: "chart.bar.fill") }
-                    .tag(NavigationItem.analytics)
-                    
-                    NavigationStack {
-                        ProfileView()
-                    }
-                    .tabItem { Label("Profile", systemImage: "person") }
-                    .tag(NavigationItem.profile)
                 }
             } else {
                 // iPad Layout
@@ -90,18 +84,22 @@ struct HomeView: View {
                     .navigationTitle("StudyBloom")
                 } detail: {
                     // Determine view based on selection
-                    // Default to Home if selection is nil
-                    switch selection ?? .home {
-                    case .home: DashboardView()
+                    // Default to Study if selection is nil
+                    switch selection ?? .study {
                     case .study: StudyDashboardView()
-                    case .flashcards: FlashcardDeckView()
                     case .chapters: ChapterListView()
+                    case .flashcards: FlashcardDeckView()
                     case .social: SocialView()
-                    case .analytics: AnalyticsView()
-                    case .profile: ProfileView()
+                    case .more: MoreView()
                     }
                 }
             }
+        }
+        .sheet(isPresented: $isShowingMoreSheet) {
+            NavigationStack {
+                MoreView()
+            }
+            .presentationDetents([.medium, .large])
         }
         .onAppear {
             SocialService.shared.startListeningForFriendRequests()
@@ -111,4 +109,36 @@ struct HomeView: View {
 
 #Preview {
     HomeView()
+}
+
+struct MoreView: View {
+    var body: some View {
+        List {
+            Section {
+                NavigationLink {
+                    DashboardView()
+                } label: {
+                    Label("Home", systemImage: "house.fill")
+                        .foregroundColor(.primary)
+                }
+                
+                NavigationLink {
+                    AnalyticsView()
+                } label: {
+                    Label("Analytics", systemImage: "chart.bar.fill")
+                        .foregroundColor(.primary)
+                }
+                
+                NavigationLink {
+                    ProfileView()
+                } label: {
+                    Label("Profile", systemImage: "person.circle")
+                        .foregroundColor(.primary)
+                }
+            } header: {
+                Text("More Options")
+            }
+        }
+        .navigationTitle("More")
+    }
 }
