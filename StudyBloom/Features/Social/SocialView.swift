@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 struct SocialView: View {
     @StateObject private var socialService = SocialService.shared
@@ -206,11 +207,11 @@ struct SocialView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(searchResults) { user in
-                    Button {
-                        selectedProfile = user
-                    } label: {
-                        UserSearchRowView(user: user)
-                    }
+                    UserSearchRowView(user: user)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            selectedProfile = user
+                        }
                 }
                 .listStyle(.plain)
             }
