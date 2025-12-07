@@ -23,19 +23,53 @@ class AuthService: NSObject, ObservableObject {
             guard let self = self else { return }
             
             if let firebaseUser = firebaseUser {
-                self.user = User(
-                    id: firebaseUser.uid,
-                    name: firebaseUser.displayName ?? "User",
-                    email: firebaseUser.email ?? ""
-                )
-                self.isAuthenticated = true
+                // Fetch full user profile from Firestore to get username
+                Task {
+                    do {
+                        var user = try await self.firebaseService.fetchUser(userId: firebaseUser.uid)
+                        
+                        // Migration: If user has no username, generate one and save it
+                        if user?.username == nil {
+                            let displayName = firebaseUser.displayName ?? "User"
+                            let generatedUsername = displayName.lowercased().replacingOccurrences(of: " ", with: "")
+                            
+                            var updatedUser = user ?? User(
+                                id: firebaseUser.uid,
+                                name: displayName,
+                                username: generatedUsername,
+                                email: firebaseUser.email ?? ""
+                            )
+                            updatedUser.username = generatedUsername
+                            
+                            try await self.firebaseService.createOrUpdateUser(updatedUser)
+                            user = updatedUser
+                        }
+                        
+                        await MainActor.run {
+                            self.user = user
+                            self.isAuthenticated = true
+                            self.isCheckingAuth = false
+                        }
+                    } catch {
+                        print("Error fetching user profile: \(error)")
+                        // Fallback to basic auth user
+                        await MainActor.run {
+                            self.user = User(
+                                id: firebaseUser.uid,
+                                name: firebaseUser.displayName ?? "User",
+                                username: nil, // Will be fixed on next successful fetch/update
+                                email: firebaseUser.email ?? ""
+                            )
+                            self.isAuthenticated = true
+                            self.isCheckingAuth = false
+                        }
+                    }
+                }
             } else {
                 self.user = nil
                 self.isAuthenticated = false
+                self.isCheckingAuth = false
             }
-            
-            // Mark auth check as complete
-            self.isCheckingAuth = false
         }
     }
     
@@ -171,9 +205,12 @@ extension AuthService: ASAuthorizationControllerDelegate {
                     }
                     
                     // Create user model for Firestore
+                    let generatedUsername = displayName.lowercased().replacingOccurrences(of: " ", with: "")
+                    
                     let user = User(
                         id: firebaseUser.uid,
                         name: displayName,
+                        username: generatedUsername,
                         email: firebaseUser.email ?? ""
                     )
                     

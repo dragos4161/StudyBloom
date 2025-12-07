@@ -30,6 +30,31 @@ struct UserProfile: Codable, Identifiable {
         self.privacySettings = privacySettings
         self.createdAt = createdAt
     }
+    
+    // Custom decoding to handle missing fields for existing users
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        id = try container.decodeIfPresent(String.self, forKey: .id)
+        displayName = try container.decode(String.self, forKey: .displayName)
+        username = try container.decode(String.self, forKey: .username)
+        profileImageUrl = try container.decodeIfPresent(String.self, forKey: .profileImageUrl)
+        studyStreak = try container.decodeIfPresent(Int.self, forKey: .studyStreak) ?? 0
+        totalStudyTime = try container.decodeIfPresent(TimeInterval.self, forKey: .totalStudyTime) ?? 0
+        privacySettings = try container.decodeIfPresent(PrivacySettings.self, forKey: .privacySettings) ?? PrivacySettings()
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case displayName = "name" // Authenticated User struct uses 'name'
+        case username
+        case profileImageUrl
+        case studyStreak
+        case totalStudyTime
+        case privacySettings
+        case createdAt
+    }
 }
 
 struct PrivacySettings: Codable {

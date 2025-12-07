@@ -43,6 +43,19 @@ class FirebaseService: ObservableObject {
                 user?.id = document.documentID
                 return user
             }
+            }
+        }
+    }
+    
+    func fetchUser(userId: String) async throws -> User? {
+        let document = try await db.collection("users").document(userId).getDocument()
+        
+        if document.exists {
+            var user = try document.data(as: User.self)
+            user.id = document.documentID
+            return user
+        } else {
+            return nil
         }
     }
     
@@ -61,6 +74,7 @@ class FirebaseService: ObservableObject {
                 // User exists - update name, email, and timestamp
                 try await userRef.updateData([
                     "name": user.name,
+                    "username": user.username as Any,
                     "email": user.email,
                     "educationLevel": user.educationLevel as Any,
                     "learningFocus": user.learningFocus as Any,
