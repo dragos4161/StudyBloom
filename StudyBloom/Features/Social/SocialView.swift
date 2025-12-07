@@ -23,7 +23,11 @@ struct SocialView: View {
                 // Segmented Control
                 Picker("Tab", selection: $selectedTab) {
                     ForEach(SocialTab.allCases, id: \.self) { tab in
-                        Text(tab.rawValue).tag(tab)
+                        if tab == .requests && badgeManager.friendRequestCount > 0 {
+                            Text("\(tab.rawValue) (\(badgeManager.friendRequestCount))").tag(tab)
+                        } else {
+                            Text(tab.rawValue).tag(tab)
+                        }
                     }
                 }
                 .pickerStyle(.segmented)
@@ -45,6 +49,9 @@ struct SocialView: View {
                     try? await loadData()
                 }
             }
+        .sheet(item: $selectedProfile) { profile in
+            FriendProfileView(profile: profile)
+        }
         }
     }
     
@@ -64,9 +71,6 @@ struct SocialView: View {
                 }
                 .listStyle(.plain)
             }
-        }
-        .sheet(item: $selectedProfile) { profile in
-            FriendProfileView(profile: profile)
         }
     }
     
@@ -207,11 +211,11 @@ struct SocialView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(searchResults) { user in
-                    UserSearchRowView(user: user)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            selectedProfile = user
-                        }
+                    Button {
+                        selectedProfile = user
+                    } label: {
+                        UserSearchRowView(user: user)
+                    }
                 }
                 .listStyle(.plain)
             }
@@ -357,6 +361,7 @@ struct FriendRequestRowView: View {
                         .foregroundStyle(.white)
                         .cornerRadius(8)
                 }
+                .buttonStyle(.borderless)
                 
                 Button {
                     onDecline()
@@ -368,6 +373,7 @@ struct FriendRequestRowView: View {
                         .foregroundStyle(.primary)
                         .cornerRadius(8)
                 }
+                .buttonStyle(.borderless)
             }
         }
         .padding(.vertical, 8)

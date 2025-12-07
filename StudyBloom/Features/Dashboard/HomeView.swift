@@ -56,17 +56,17 @@ struct HomeView: View {
                     .tag(NavigationItem.flashcards)
                     
                     NavigationStack {
-                        ChapterListView()
-                    }
-                    .tabItem { Label("Chapters", systemImage: "list.bullet") }
-                    .tag(NavigationItem.chapters)
-                    
-                    NavigationStack {
                         SocialView()
                     }
                     .tabItem { Label("Social", systemImage: "person.2.fill") }
                     .tag(NavigationItem.social)
                     .badge(badgeManager.friendRequestCount)
+                    
+                    NavigationStack {
+                        ChapterListView()
+                    }
+                    .tabItem { Label("Chapters", systemImage: "list.bullet") }
+                    .tag(NavigationItem.chapters)
                     
                     NavigationStack {
                         AnalyticsView()
