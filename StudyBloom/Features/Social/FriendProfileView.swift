@@ -7,6 +7,8 @@ struct FriendProfileView: View {
     @State private var sharedDecks: [SharedDeck] = []
     @State private var isLoadingDecks = false
     @State private var showingRemoveAlert = false
+    @State private var friendStatus: SocialService.FriendStatus = .notFriends
+    @State private var isProcessing = false
     
     var body: some View {
         NavigationView {
@@ -47,16 +49,74 @@ struct FriendProfileView: View {
                     
                     Spacer(minLength: 20)
                     
-                    // Remove Friend Button
-                    Button(role: .destructive) {
-                        showingRemoveAlert = true
-                    } label: {
-                        Label("Remove Friend", systemImage: "person.fill.xmark")
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color(.systemGray6))
-                            .foregroundStyle(.red)
-                            .cornerRadius(12)
+                    // Action Buttons
+                    Group {
+                        switch friendStatus {
+                        case .notFriends:
+                            Button {
+                                sendFriendRequest()
+                            } label: {
+                                Label("Add Friend", systemImage: "person.badge.plus")
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.blue)
+                                    .foregroundStyle(.white)
+                                    .cornerRadius(12)
+                            }
+                            
+                        case .requestSent:
+                            Button {
+                                // Already sent
+                            } label: {
+                                Label("Request Sent", systemImage: "clock.fill")
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color(.systemGray5))
+                                    .foregroundStyle(.secondary)
+                                    .cornerRadius(12)
+                            }
+                            .disabled(true)
+                            
+                        case .requestReceived:
+                            HStack(spacing: 16) {
+                                Button {
+                                    acceptRequest()
+                                } label: {
+                                    Label("Accept", systemImage: "checkmark")
+                                        .frame(maxWidth: .infinity)
+                                        .padding()
+                                        .background(Color.blue)
+                                        .foregroundStyle(.white)
+                                        .cornerRadius(12)
+                                }
+                                
+                                Button {
+                                    declineRequest()
+                                } label: {
+                                    Label("Decline", systemImage: "xmark")
+                                        .frame(maxWidth: .infinity)
+                                        .padding()
+                                        .background(Color(.systemGray5))
+                                        .foregroundStyle(.primary)
+                                        .cornerRadius(12)
+                                }
+                            }
+                            
+                        case .friend:
+                            Button(role: .destructive) {
+                                showingRemoveAlert = true
+                            } label: {
+                                Label("Remove Friend", systemImage: "person.fill.xmark")
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color(.systemGray6))
+                                    .foregroundStyle(.red)
+                                    .cornerRadius(12)
+                            }
+                            
+                        case .selfProfile:
+                            EmptyView()
+                        }
                     }
                     .padding(.horizontal)
                 }
@@ -70,7 +130,7 @@ struct FriendProfileView: View {
                 }
             }
             .task {
-                await loadSharedDecks()
+                await loadData()
             }
             .alert("Remove Friend?", isPresented: $showingRemoveAlert) {
                 Button("Cancel", role: .cancel) {}
@@ -154,24 +214,76 @@ struct FriendProfileView: View {
     
     // MARK: - Helper Methods
     
-    private func loadSharedDecks() async {
+    private func loadData() async {
         isLoadingDecks = true
         
-        do {
-            guard let userId = profile.id else { return }
-            let decks = try await socialService.fetchSharedDecks(from: userId)
-            
-            await MainActor.run {
-                // Filter decks based on visibility
-                self.sharedDecks = decks.filter { deck in
-                    deck.visibility == .public || deck.visibility == .friends
+        // Check friendship status first
+        if let userId = profile.id {
+            do {
+                let status = try await socialService.checkFriendshipStatus(with: userId)
+                await MainActor.run {
+                    self.friendStatus = status
                 }
-                isLoadingDecks = false
+                
+                // Only load shared decks if friends or public visibility logic allows (SocialService handles fetching, we filter later)
+                // But for now, let's load decks regardless and filter by what SocialService returns
+                let decks = try await socialService.fetchSharedDecks(from: userId)
+                await MainActor.run {
+                    self.sharedDecks = decks.filter { deck in
+                        deck.visibility == .public || (deck.visibility == .friends && status == .friend)
+                    }
+                    isLoadingDecks = false
+                }
+            } catch {
+                print("Error loading data: \(error)")
+                await MainActor.run { isLoadingDecks = false }
             }
-        } catch {
-            print("Error loading shared decks: \(error)")
-            await MainActor.run {
-                isLoadingDecks = false
+        } else {
+            await MainActor.run { isLoadingDecks = false }
+        }
+    }
+    
+    private func sendFriendRequest() {
+        guard let userId = profile.id else { return }
+        isProcessing = true
+        
+        Task {
+            do {
+                try await socialService.sendFriendRequest(
+                    to: userId,
+                    recipientName: profile.displayName,
+                    recipientUsername: profile.username
+                )
+                await MainActor.run {
+                    friendStatus = .requestSent
+                    isProcessing = false
+                }
+            } catch {
+                print("Error sending request: \(error)")
+                await MainActor.run { isProcessing = false }
+            }
+        }
+    }
+    
+    private func acceptRequest() {
+        // Need request ID... logic gap. 
+        // We need to fetch the request ID if status is requestReceived.
+        // For now, let's just refresh data or handle in list view mostly.
+        // Or fetch pending requests and find match.
+        Task {
+            // Find request ID
+            if let request = socialService.pendingRequests.first(where: { $0.senderId == profile.id }) {
+                try? await socialService.acceptFriendRequest(request.id ?? "")
+                await loadData()
+            }
+        }
+    }
+    
+    private func declineRequest() {
+        Task {
+            if let request = socialService.pendingRequests.first(where: { $0.senderId == profile.id }) {
+                try? await socialService.declineFriendRequest(request.id ?? "")
+                await loadData()
             }
         }
     }

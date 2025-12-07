@@ -169,6 +169,69 @@ class SocialService: ObservableObject {
         return profile
     }
     
+    // MARK: - Friendship Status
+    
+    enum FriendStatus {
+        case notFriends
+        case friend
+        case requestSent
+        case requestReceived
+        case selfProfile
+    }
+    
+    func checkFriendshipStatus(with userId: String) async throws -> FriendStatus {
+        guard let currentUserId = Auth.auth().currentUser?.uid else { return .notFriends }
+        
+        if currentUserId == userId {
+            return .selfProfile
+        }
+        
+        // 1. Check if already friends
+        // We can check our local friends list since it's populated
+        if friends.contains(where: { $0.id == userId }) {
+            return .friend
+        }
+        
+        // If local list isn't populated or to be sure, check Firestore
+        let friendshipQuery = try await db.collection("friendships")
+            .whereField("user1Id", isEqualTo: currentUserId)
+            .whereField("user2Id", isEqualTo: userId)
+            .getDocuments()
+            
+        let friendshipQuery2 = try await db.collection("friendships")
+            .whereField("user1Id", isEqualTo: userId)
+            .whereField("user2Id", isEqualTo: currentUserId)
+            .getDocuments()
+            
+        if !friendshipQuery.documents.isEmpty || !friendshipQuery2.documents.isEmpty {
+            return .friend
+        }
+        
+        // 2. Check if request sent by me
+        let sentRequest = try await db.collection("friendRequests")
+            .whereField("senderId", isEqualTo: currentUserId)
+            .whereField("receiverId", isEqualTo: userId)
+            .whereField("status", isEqualTo: "pending")
+            .getDocuments()
+            
+        if !sentRequest.documents.isEmpty {
+            return .requestSent
+        }
+        
+        // 3. Check if request received from them
+        let receivedRequest = try await db.collection("friendRequests")
+            .whereField("senderId", isEqualTo: userId)
+            .whereField("receiverId", isEqualTo: currentUserId)
+            .whereField("status", isEqualTo: "pending")
+            .getDocuments()
+            
+        if !receivedRequest.documents.isEmpty {
+            return .requestReceived
+        }
+        
+        return .notFriends
+    }
+    
     // MARK: - Flashcard Sharing
     
     func shareFlashcardDeck(_ deck: SharedDeck) async throws {
