@@ -9,6 +9,7 @@ struct FlashcardDeckView: View {
     @EnvironmentObject var dataService: DataService
     @State private var showingCreateSheet = false
     @State private var deckToShare: ShareableDeck?
+    @State private var deckToManage: DeckWrapper?
     @State private var selectedDeck: DeckWrapper?
     
     @Environment(\.horizontalSizeClass) var sizeClass
@@ -47,6 +48,11 @@ struct FlashcardDeckView: View {
         }
         .sheet(item: $deckToShare) { deck in
             ShareDeckView(flashcards: deck.cards, initialTitle: deck.title)
+        }
+        .sheet(item: $deckToManage) { deckWrapper in
+            NavigationView {
+                DeckEditorView(deckTitle: "Manage Deck", cards: deckWrapper.cards)
+            }
         }
         .fullScreenCover(item: $selectedDeck) { deckWrapper in
             NavigationView {
@@ -97,19 +103,48 @@ struct FlashcardDeckView: View {
             Section(header: sectionHeader("By Chapter")) {
                 ForEach(dataService.chapters) { chapter in
                     let chapterCards = dataService.flashcards.filter { $0.chapterId == chapter.id }
-                    if !chapterCards.isEmpty {
-                        deckItem(title: chapter.title, count: chapterCards.count, color: Color(hex: chapter.colorHex) ?? .purple) {
+                    // Show chapter even if empty so it can be deleted!
+                    // Wait, previously checking !chapterCards.isEmpty.
+                    // If we want to allow deleting empty imported decks, we should remove that check.
+                    
+                    deckItem(title: chapter.title, count: chapterCards.count, color: Color(hex: chapter.colorHex) ?? .purple) {
+                        if !chapterCards.isEmpty {
                             selectedDeck = DeckWrapper(cards: chapterCards)
+                        } else {
+                            // Can't study empty deck, but maybe show alert or just nothing?
                         }
-                        .contextMenu {
-                            Button {
-                                deckToShare = ShareableDeck(title: chapter.title, cards: chapterCards)
-                            } label: {
-                                Label("Share Deck", systemImage: "square.and.arrow.up")
-                            }
+                    }
+                    .contextMenu {
+                        Button {
+                            deckToShare = ShareableDeck(title: chapter.title, cards: chapterCards)
+                        } label: {
+                            Label("Share Deck", systemImage: "square.and.arrow.up")
+                        }
+                        
+                        Button {
+                            // Manage Cards
+                            deckToManage = DeckWrapper(cards: chapterCards)
+                        } label: {
+                            Label("Manage Cards", systemImage: "rectangle.stack")
+                        }
+                        
+                        Button(role: .destructive) {
+                            deleteChapter(chapter)
+                        } label: {
+                            Label("Delete Deck", systemImage: "trash")
                         }
                     }
                 }
+            }
+        }
+    }
+    
+    private func deleteChapter(_ chapter: Chapter) {
+        Task {
+            do {
+                try await dataService.deleteChapter(chapter)
+            } catch {
+                print("Error deleting deck: \(error)")
             }
         }
     }

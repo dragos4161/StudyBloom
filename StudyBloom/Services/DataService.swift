@@ -303,8 +303,9 @@ class DataService: ObservableObject {
                 NotificationManager.shared.userDidStudy(pages: newLog.pagesLearned)
             }
             
-            // Log to Analytics (if not a free day)
-            if !newLog.isFreeDay && newLog.pagesLearned > 0 {
+                // No longer tracking estimated time from manual logs
+                // Study time is now exclusively tracked via Pomodoro Timer
+                /*
                 Task {
                     // Estimate study time (2 min per page average)
                     let estimatedTime = Double(newLog.pagesLearned) * 120
@@ -313,7 +314,21 @@ class DataService: ObservableObject {
                         duration: estimatedTime
                     )
                 }
-            }
+                */
+                
+                // We still want to log the "pages studied" part to analytics though?
+                // The prompt says "the study time should be only linked to the pomodoro timer sessions"
+                // It implies we should track pages separately or not convert pages to time.
+                // AnalyticsService.logStudySession takes both.
+                // If I remove this, we lose "Total Pages Studied" tracking unless I split the method.
+                // Let's modify this to log duration: 0.
+                
+                Task {
+                     try? await AnalyticsService.shared.logStudySession(
+                        pages: newLog.pagesLearned,
+                        duration: 0 // Don't add to time, just track pages
+                    )
+                }
         } catch {
             print("❌ Error adding daily log: \(error.localizedDescription)")
             throw error

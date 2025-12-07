@@ -24,11 +24,18 @@ struct ChapterListView: View {
                                 .font(.headline)
                                 .foregroundStyle(.primary)
                             HStack {
-                                ProgressView(value: Double(chapter.pagesStudied), total: Double(chapter.totalPages))
-                                    .tint(Color(hex: chapter.colorHex) ?? .purple)
-                                Text("\(chapter.pagesStudied)/\(chapter.totalPages)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                if chapter.totalPages > 0 {
+                                    ProgressView(value: Double(chapter.pagesStudied), total: Double(chapter.totalPages))
+                                        .tint(Color(hex: chapter.colorHex) ?? .purple)
+                                    Text("\(chapter.pagesStudied)/\(chapter.totalPages)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                } else {
+                                    // Imported decks (0 total pages)
+                                    Text("Flashcard Deck")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
                             }
                         }
                     }

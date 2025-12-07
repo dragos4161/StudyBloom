@@ -139,6 +139,9 @@ class TimerService: ObservableObject {
         }
     }
     
+    // Closure for decoupling AnalyticsService (since this service is shared with Widget target)
+    var onSessionCompleted: ((TimeInterval) -> Void)?
+    
     private func finishTimer() {
         timer?.invalidate()
         state = .idle
@@ -154,6 +157,11 @@ class TimerService: ObservableObject {
             // Start the break timer immediately
             startTimer() 
             // Activity will be updated by startTimer()
+            
+            // Log study session to analytics via closure
+            let sessionDuration = mode.focusDuration
+            onSessionCompleted?(sessionDuration)
+            
         } else {
             // Break ended -> Go to Focus (but don't auto-start)
             endActivity() // Only end activity when full cycle complete
