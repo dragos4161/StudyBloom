@@ -5,6 +5,9 @@ struct PomodoroView: View {
     @StateObject private var audioService = AmbientAudioService.shared
     @Environment(\.dismiss) var dismiss
     
+    @AppStorage("focusSound") private var focusSound: AmbientAudioService.AmbientSound = .rain
+    @AppStorage("breakSound") private var breakSound: AmbientAudioService.AmbientSound = .stream
+    
     // Formatting
     private var timeString: String {
         let minutes = Int(timerService.timeRemaining) / 60
@@ -23,26 +26,24 @@ struct PomodoroView: View {
             Color(uiColor: .systemBackground)
                 .ignoresSafeArea()
             
-            VStack(spacing: 40) {
-                // Header
-                HStack {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(.gray)
+            VStack(spacing: 20) {
+                // Header - Using ZStack for better alignment
+                ZStack {
+                    HStack {
+                        Button(action: { dismiss() }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.title) // Slightly larger
+                                .foregroundStyle(.gray)
+                        }
+                        Spacer()
                     }
-                    Spacer()
+                    
                     Text(timerService.isBreak ? "Break Time" : "Focus Session")
                         .font(.headline)
                         .foregroundStyle(.secondary)
-                    Spacer()
-                    // Hidden balance
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title2)
-                        .foregroundStyle(.clear)
                 }
                 .padding(.horizontal)
-                .padding(.top, 20)
+                .padding(.top, 30) // Increased top padding for better visibility
                 
                 // Timer Visualization
                 ZStack {
@@ -92,10 +93,10 @@ struct PomodoroView: View {
                             }
                         }) {
                             Image(systemName: timerService.state == .running ? "pause.circle.fill" : "play.circle.fill")
-                                .font(.system(size: 70))
-                                .foregroundStyle(timerService.isBreak ? .green : .blue)
-                                .shadow(radius: 5)
-                                .symbolEffect(.bounce, value: timerService.state)
+                            .font(.system(size: 70))
+                            .foregroundStyle(timerService.isBreak ? .green : .blue)
+                            .shadow(radius: 5)
+                            .symbolEffect(.bounce, value: timerService.state)
                         }
                         
                         if timerService.state != .idle {
@@ -108,34 +109,109 @@ struct PomodoroView: View {
                     }
                 }
                 
-                // Ambient Sound Selector
-                VStack(spacing: 12) {
-                    Text("Ambient Sound")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .textCase(.uppercase)
-                    
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 16) {
-                            ForEach(AmbientAudioService.AmbientSound.allCases) { sound in
-                                AmbientSoundButton(
-                                    sound: sound,
-                                    isSelected: audioService.selectedSound == sound,
-                                    action: { audioService.play(sound: sound) }
-                                )
+                // Sound Configuration
+                VStack(spacing: 20) {
+                    // Focus Sound Picker
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Focus Sound")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 16) {
+                                ForEach(AmbientAudioService.AmbientSound.allCases) { sound in
+                                    AmbientSoundButton(
+                                        sound: sound,
+                                        isSelected: focusSound == sound,
+                                        action: { 
+                                            focusSound = sound
+                                            // Preview if idle, or update if running matching phase
+                                            if timerService.state == .idle || (timerService.state == .running && !timerService.isBreak) {
+                                                audioService.play(sound: sound)
+                                            }
+                                        }
+                                    )
+                                }
                             }
                         }
-                        .padding(.horizontal)
+                    }
+                    
+                    // Break Sound Picker
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Break Sound")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 16) {
+                                ForEach(AmbientAudioService.AmbientSound.allCases) { sound in
+                                    AmbientSoundButton(
+                                        sound: sound,
+                                        isSelected: breakSound == sound,
+                                        action: { 
+                                            breakSound = sound
+                                            // Preview if idle, or update if running matching phase
+                                            if timerService.state == .idle || (timerService.state == .running && timerService.isBreak) {
+                                                audioService.play(sound: sound)
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
+                .padding(.horizontal)
                 
                 Spacer()
             }
         }
+        .onChange(of: timerService.state) { newState in
+           handleStateChange(newState)
+        }
+        .onChange(of: timerService.isBreak) { isBreak in
+            handleBreakChange(isBreak)
+        }
         .onDisappear {
-            if timerService.state != .running {
-                audioService.stop()
-            }
+            // Stop sound when view disappears if not running background mode logic (simple version)
+            // But we want it to keep playing if backgrounded? 
+            // The request says "when paused... sound should stop".
+            // If we just close the sheet, it might imply "stop".
+            // But usually Pomodoro runs in background. 
+            // Let's rely on TimerService state.
+        }
+    }
+    
+    private func handleStateChange(_ state: TimerService.TimerState) {
+        switch state {
+        case .running:
+            let soundToPlay = timerService.isBreak ? breakSound : focusSound
+            audioService.play(sound: soundToPlay)
+        case .paused:
+            audioService.pause()
+        case .idle:
+            audioService.stop()
+        }
+    }
+    
+    private func handleBreakChange(_ isBreak: Bool) {
+        // Transition happened
+        
+        // 1. Play Alarm
+        audioService.playAlarm()
+        
+        // 2. Switch sound if running
+        if timerService.state == .running {
+            let soundToPlay = isBreak ? breakSound : focusSound
+            audioService.play(sound: soundToPlay)
+        } else {
+             // If we went to idle (e.g. break finished -> idle), logic in handleStateChange(.idle) stops sound.
+             // But we still want the alarm. 
+             // If timerService finishes break, it sets isBreak=false and state=idle.
+             // Both onChange fire. Order matters.
+             // Alarm relies on being transient.
         }
     }
 }

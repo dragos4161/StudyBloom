@@ -154,25 +154,51 @@ class AnalyticsService: ObservableObject {
     private func updateStreak(stats: inout StudyStatistics) {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        let yesterday = calendar.date(byAdding: .day, value: -1, to: today)!
         
-        // Check if user studied yesterday
-        let studiedYesterday = stats.dailyStats.contains { stat in
-            calendar.isDate(stat.date, inSameDayAs: yesterday) && stat.pagesStudied > 0
-        }
+        // Sort daily stats by date descending
+        let sortedStats = stats.dailyStats.sorted { $0.date > $1.date }
         
-        // Check if user studied today
-        let studiedToday = stats.dailyStats.contains { stat in
-            calendar.isDate(stat.date, inSameDayAs: today) && stat.pagesStudied > 0
-        }
+        var currentStreak = 0
+        var lastDate: Date?
         
-        if studiedToday {
-            if studiedYesterday || stats.currentStreak == 0 {
-                stats.currentStreak += 1
+        for stat in sortedStats {
+            // Check if this day has any activity (pages, time, or sessions)
+            if stat.pagesStudied > 0 || stat.studyTime > 0 || stat.pomodoroSessions > 0 || stat.flashcardsReviewed > 0 {
+                let statDate = calendar.startOfDay(for: stat.date)
+                
+                if let last = lastDate {
+                    // Check if consecutive (1 day difference)
+                    let diff = calendar.dateComponents([.day], from: statDate, to: last).day ?? 0
+                    
+                    if diff == 1 {
+                        currentStreak += 1
+                        lastDate = statDate
+                    } else if diff == 0 {
+                        // Same day, ignore (already counted)
+                        continue
+                    } else {
+                        // Gap found, streak ends
+                        break
+                    }
+                } else {
+                    // First valid day found (either today or most recent active day)
+                    // Check if it's today or yesterday to trigger current streak
+                    // If the most recent activity was 2 days ago, streak is 0.
+                    let diffFromToday = calendar.dateComponents([.day], from: statDate, to: today).day ?? 0
+                    
+                    if diffFromToday <= 1 {
+                        currentStreak = 1
+                        lastDate = statDate
+                    } else {
+                        // Most recent activity is too old
+                        currentStreak = 0
+                        break
+                    }
+                }
             }
-        } else {
-            stats.currentStreak = 0
         }
+        
+        stats.currentStreak = currentStreak
         
         // Update longest streak
         if stats.currentStreak > stats.longestStreak {

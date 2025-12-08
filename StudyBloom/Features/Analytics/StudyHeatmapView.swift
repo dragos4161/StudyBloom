@@ -17,8 +17,9 @@ struct StudyHeatmapView: View {
             
             // Weekday Labels
             HStack(spacing: 4) {
-                ForEach(["M", "T", "W", "T", "F", "S", "S"], id: \.self) { day in
-                    Text(day)
+                let days = ["M", "T", "W", "T", "F", "S", "S"]
+                ForEach(0..<days.count, id: \.self) { index in
+                    Text(days[index])
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)

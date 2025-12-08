@@ -11,7 +11,7 @@ struct PlanSettingsView: View {
     @State private var hasInitialized = false
     
     let weekdays = [
-        (1, "S"), (2, "M"), (3, "T"), (4, "W"), (5, "T"), (6, "F"), (7, "S")
+        (2, "M"), (3, "T"), (4, "W"), (5, "T"), (6, "F"), (7, "S"), (1, "S")
     ]
     
 

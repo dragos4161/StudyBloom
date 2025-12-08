@@ -1,5 +1,6 @@
 import Foundation
 import AVFoundation
+import AudioToolbox
 import Combine
 
 class AmbientAudioService: ObservableObject {
@@ -50,8 +51,13 @@ class AmbientAudioService: ObservableObject {
         }
     }
     
-    func play(sound: AmbientSound) {
+    func play(sound: AmbientSound, volume: Float = 1.0) {
         if isPlaying {
+            // If already playing the same sound, just return (or update volume if needed)
+            if selectedSound == sound {
+                playerNode.volume = volume
+                return
+            }
             stop()
         }
         
@@ -61,29 +67,50 @@ class AmbientAudioService: ObservableObject {
         }
         
         selectedSound = sound
+        playerNode.volume = volume
         
         if let buffer = generateNoiseBuffer(type: sound) {
-            engine.disconnectNodeInput(playerNode)
-            engine.connect(playerNode, to: engine.mainMixerNode, format: buffer.format)
-            
-            playerNode.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
-            
-            do {
-                if !engine.isRunning {
-                    try engine.start()
-                }
-                playerNode.play()
-                isPlaying = true
-            } catch {
-                print("Failed to start engine: \(error)")
+            // Ensure engine is running
+            if !engine.isRunning {
+                try? engine.start()
             }
+            
+            // Connect and schedule
+            engine.connect(playerNode, to: engine.mainMixerNode, format: buffer.format)
+            playerNode.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
+            playerNode.play()
+            isPlaying = true
+        }
+    }
+    
+    func pause() {
+        if isPlaying {
+            playerNode.pause()
+            isPlaying = false
+        }
+    }
+    
+    func resume() {
+        if !isPlaying && selectedSound != .none {
+            if !engine.isRunning {
+                try? engine.start()
+            }
+            playerNode.play()
+            isPlaying = true
         }
     }
     
     func stop() {
         playerNode.stop()
-        engine.stop()
         isPlaying = false
+    }
+    
+    func playAlarm() {
+        // System Sound 1005 is a standard alarm sound
+        // 1304 is a "tweet" sound, often used for messages
+        // 1016 is "Bell"
+        // Let's use 1005 for now
+        AudioServicesPlaySystemSound(1005)
     }
     
     private func generateNoiseBuffer(type: AmbientSound) -> AVAudioPCMBuffer? {

@@ -526,20 +526,24 @@ struct CalendarGridView: View {
             .padding(.horizontal, 8)
             
             // Calendar Grid with Swipe
+            // Weekday headers - Separated to avoid ID conflict and static layout
             LazyVGrid(columns: columns, spacing: 8) {
-                // Weekday headers
-                let weekdays = ["S", "M", "T", "W", "T", "F", "S"]
+                let weekdays = ["M", "T", "W", "T", "F", "S", "S"]
                 ForEach(0..<7, id: \.self) { index in
                     Text(weekdays[index])
                         .font(.caption2)
                         .fontWeight(.bold)
                         .foregroundStyle(.secondary)
                 }
-                
+            }
+            
+            // Calendar Grid with Swipe
+            LazyVGrid(columns: columns, spacing: 8) {
                 // Days
                 if let firstDay = days.first {
                     let weekday = calendar.component(.weekday, from: firstDay)
-                    let offset = weekday - 1
+                    // Convert to Monday-start offset: Mon(2)->0, ... Sun(1)->6
+                    let offset = (weekday + 5) % 7
                     ForEach(0..<offset, id: \.self) { _ in
                         Spacer()
                     }

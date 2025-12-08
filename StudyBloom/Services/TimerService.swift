@@ -150,24 +150,38 @@ class TimerService: ObservableObject {
         // Auto-transition logic
         if !isBreak {
             // Focus ended -> Start Break
-            // DON'T end activity here - let it transition to break
-            isBreak = true
-            resetTimer(shouldEndActivity: false) // Don't end activity, just reset time
             
-            // Start the break timer immediately
-            startTimer() 
-            // Activity will be updated by startTimer()
-            
-            // Log study session to analytics via closure
+            // 1. Log session
             let sessionDuration = mode.focusDuration
             onSessionCompleted?(sessionDuration)
             
+            // 2. Transition
+            isBreak = true
+            
+            // 3. Reset timer for break duration (don't end activity yet)
+            let breakDuration = mode.breakDuration
+            timeRemaining = breakDuration
+            totalTime = breakDuration
+            
+            // CRITICAL: Update activity to reflect "Break" state before starting next timer
+            // A slight delay or direct update ensures the UI catches the "Break" state
+            updateActivity()
+            
+            // 4. Start Break Timer automatically
+            startTimer()
+            
         } else {
-            // Break ended -> Go to Focus (but don't auto-start)
-            endActivity() // Only end activity when full cycle complete
+            // Break ended -> Go to Focus (Idle)
             isBreak = false
-            resetTimer() // Sets focus time (ends activity by default)
-            AmbientAudioService.shared.stop() // Stop noise when full cycle done
+            
+            // End activity for the full session cycle
+            endActivity()
+            
+            // Reset to focus time
+            resetTimer(shouldEndActivity: false) // Activity already ended above
+            
+            // Stop sound handled by View via state observation or here if we moved logic to Service
+            // kept in View for now as per plan
         }
     }
     
