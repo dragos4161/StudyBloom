@@ -148,6 +148,12 @@ struct StudyDashboardView: View {
     
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarLeading) {
+            NavigationLink(destination: AnalyticsView()) {
+                Image(systemName: "chart.bar.xaxis")
+            }
+        }
+        
         ToolbarItem(placement: .navigationBarTrailing) {
             HStack {
                 Button(action: { isShowingTimer = true }) {

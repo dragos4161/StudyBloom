@@ -6,6 +6,7 @@ struct ChapterListView: View {
     private var chapters: [Chapter] { dataService.chapters }
     
     @State private var selectedChapter: Chapter?
+    @State private var chapterToEdit: Chapter?
     @State private var isShowingAddChapter = false
     
     var body: some View {
@@ -41,6 +42,29 @@ struct ChapterListView: View {
                     }
                     .padding(.vertical, 4)
                 }
+                .swipeActions(edge: .leading) {
+                    Button {
+                        chapterToEdit = chapter
+                    } label: {
+                        Label("Edit", systemImage: "pencil")
+                    }
+                    .tint(.blue)
+                }
+                .contextMenu {
+                    Button {
+                        chapterToEdit = chapter
+                    } label: {
+                        Label("Edit", systemImage: "pencil")
+                    }
+                    
+                    Button(role: .destructive) {
+                        Task {
+                            try? await dataService.deleteChapter(chapter)
+                        }
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
             }
             .onMove(perform: moveChapters)
             .onDelete(perform: deleteChapters)
@@ -65,6 +89,9 @@ struct ChapterListView: View {
                     try? await dataService.updateChapter(updatedChapter)
                 }
             }
+        }
+        .sheet(item: $chapterToEdit) { chapter in
+            EditChapterView(chapter: chapter)
         }
         .sheet(isPresented: $isShowingAddChapter) {
             AddChapterView()
